@@ -18,6 +18,11 @@ public partial class MainWindow : Window, IDialogs
         InitializeComponent();
         _vm = new MainViewModel(this);
         DataContext = _vm;
+        // Grid columns aren't in the visual tree, so this one's visibility can't be bound.
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.NameIsNumber)) PartNumberColumn.Visibility = _vm.NameIsNumber ? Visibility.Collapsed : Visibility.Visible;
+        };
     }
 
     /// <summary>Open the Vaults window once the vault is loaded.</summary>

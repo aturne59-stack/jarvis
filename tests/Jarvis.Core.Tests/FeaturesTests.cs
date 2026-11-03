@@ -136,6 +136,43 @@ public class FeaturesTests
         Assert.Contains("Starting folder \"Bad:Name\"", VaultCreator.Validate(request));
     }
 
+    [Fact]
+    public void Numbering_NameIsNumber_OneSequence_FileNameIsTheNumber()
+    {
+        var scheme = NumberingScheme.Parse("{ \"prefix\": \"TLT\", \"digits\": 3, \"nameIsNumber\": true, \"cotsFolder\": \"COTS\" }")!;
+
+        Assert.NotNull(scheme);
+        Assert.Null(scheme.Problem());
+        var group = Assert.Single(scheme.Groups);
+        Assert.Equal(1, scheme.NextNumber(group, new[] { "Old Name.SLDPRT" }));
+        Assert.Equal(3, scheme.NextNumber(group, new[] { "TLT-001.SLDPRT", "TLT-002" }));
+        Assert.Equal(1000 - 1, scheme.RangeOf(group).Last);
+        Assert.Equal("TLT-007", scheme.FileName(7, "Bearing housing"));
+        Assert.True(scheme.Fits("TLT-640.SLDASM"));
+        Assert.Equal("TLT-001.SLDPRT", scheme.Example());
+    }
+
+    [Theory]
+    [InlineData("COTS/MCMASTER/91251A540_Screw.SLDPRT", true, true)]
+    [InlineData("91251A540_Socket Head Screw.SLDPRT", false, true)]
+    [InlineData("5709K77_Tapered-Roller Bearing.SLDPRT", false, true)]
+    [InlineData("TLT-201-Turret.SLDPRT", false, false)]
+    [InlineData("bearing_block.SLDPRT", false, false)]
+    [InlineData("Cotsy/part.SLDPRT", false, false)]
+    public void Numbering_NameIsNumber_Cots(string path, bool isCots, bool looksBought)
+    {
+        var scheme = NumberingScheme.Parse("{ \"prefix\": \"TLT\", \"digits\": 3, \"nameIsNumber\": true, \"cotsFolder\": \"COTS\" }")!;
+        Assert.Equal(isCots, scheme.IsCots(path));
+        Assert.Equal(looksBought, scheme.LooksBought(path));
+    }
+
+    [Fact]
+    public void Numbering_NameIsNumber_NeedsAPrefix()
+    {
+        var scheme = new NumberingScheme { Prefix = "", NameIsNumber = true };
+        Assert.Contains("prefix", scheme.Problem());
+    }
+
     [Theory]
     [InlineData("Turret/plate.SLDPRT", "Clamp Plate", "Turret/Clamp Plate.SLDPRT")]
     [InlineData("Turret/plate.SLDPRT", " Clamp Plate.sldprt ", "Turret/Clamp Plate.SLDPRT")]

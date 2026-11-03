@@ -1031,12 +1031,13 @@ internal sealed class VaultPane : UserControl
         if (newSolidWorks.Count > 0)
         {
             // With a part-numbering convention, each new file also gets a group, the next free number and (optionally) a matching name.
+            var scheme = _vault.LoadNumbering();
             using var describe = new DescriptionForm(newSolidWorks.Select(p => (p, CurrentDescription(p))).ToList(),
-                _vault.LoadNumbering(), VaultService.UsedPartNumbers(_snapshot?.Files ?? Array.Empty<VaultFile>()));
+                scheme, VaultService.UsedPartNumbers(_snapshot?.Files ?? Array.Empty<VaultFile>()), _vault.ToRelativePath);
             if (describe.ShowDialog(_sw.MainWindow) != DialogResult.OK) return;
             newDescriptions = describe.Descriptions;
             newPartNumbers = describe.PartNumbers;
-            renames = describe.Renames;
+            renames = ConventionTargets(scheme, describe.Renames, describe.PartNumbers.Keys, describe.BoughtFiles, newSolidWorks);
         }
 
 
@@ -1157,8 +1158,42 @@ internal sealed class VaultPane : UserControl
     }
 
     /// <summary>
-    /// After a check-in: renames new files to the names the part-numbering convention gives them, with the same
-    /// move as Rename / Move (assemblies using them are updated and checked in too). Returns a line for the status.
+    /// Where new files go after check-in (full path to vault-relative path): renamed to their part number in their
+    /// folder; with file names that are numbers, ours at the top of the vault, bought ones into the COTS folder, and
+    /// drawings named after their model. Models come first, so drawings move after them.
+    /// </summary>
+    private Dictionary<string, string> ConventionTargets(NumberingScheme? scheme, Dictionary<string, string> renames, IEnumerable<string> ours, HashSet<string> bought, IReadOnlyList<string> newFiles)
+    {
+        var targets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (_vault == null || scheme == null) return targets;
+        static string FolderOf(string relative) => relative.Contains('/') ? relative.Substring(0, relative.LastIndexOf('/') + 1) : "";
+        foreach (var pair in renames)
+        {
+            targets[pair.Key] = (scheme.NameIsNumber ? "" : FolderOf(_vault.ToRelativePath(pair.Key))) + pair.Value;
+        }
+        if (!scheme.NameIsNumber) return targets;
+        foreach (var path in ours.Where(p => !targets.ContainsKey(p) && _vault.ToRelativePath(p).Contains('/')))
+        {
+            targets[path] = Path.GetFileName(path); // already named by its number, but ours go at the top of the vault
+        }
+        foreach (var path in bought.Where(p => scheme.CotsFolder.Length > 0 && !scheme.IsCots(_vault.ToRelativePath(p))))
+        {
+            targets[path] = scheme.CotsFolder + "/" + Path.GetFileName(path);
+        }
+        foreach (var drawing in newFiles.Where(p => p.EndsWith(".slddrw", StringComparison.OrdinalIgnoreCase)))
+        {
+            var model = _sw.GetReferences(drawing, allLevels: false).FirstOrDefault(IsInVault);
+            if (model == null) continue;
+            var modelTarget = targets.TryGetValue(model, out var moved) ? moved : _vault.ToRelativePath(model);
+            var wanted = FolderOf(modelTarget) + Path.GetFileNameWithoutExtension(modelTarget) + Path.GetExtension(drawing);
+            if (!string.Equals(wanted, _vault.ToRelativePath(drawing), StringComparison.OrdinalIgnoreCase)) targets[drawing] = wanted;
+        }
+        return targets;
+    }
+
+    /// <summary>
+    /// After a check-in: moves new files to where the part-numbering convention puts them (<see cref="ConventionTargets"/>),
+    /// with the same move as Rename / Move (assemblies using them are updated and checked in too). Returns a line for the status.
     /// </summary>
     private async Task<string?> RenameToConventionAsync(Dictionary<string, string> renames, IProgress<string> progress)
     {
@@ -1169,9 +1204,8 @@ internal sealed class VaultPane : UserControl
         foreach (var pair in renames)
         {
             var from = _vault.ToRelativePath(pair.Key);
-            var slash = from.LastIndexOf('/');
-            var to = (slash < 0 ? "" : from.Substring(0, slash + 1)) + pair.Value;
-            progress.Report($"Renaming {Path.GetFileName(pair.Key)} to {pair.Value}\u2026");
+            var to = pair.Value;
+            progress.Report($"Renaming {Path.GetFileName(pair.Key)} to {to}\u2026");
             try
             {
                 var plan = await _vault.PlanMoveAsync(new[] { new FileMove(from, to) }, editor, progress);
@@ -1181,7 +1215,7 @@ internal sealed class VaultPane : UserControl
                     continue;
                 }
                 var result = await _vault.MoveAsync(plan, editor, VaultService.MoveComment(plan.Moves), progress);
-                if (result.Failures.Count == 0) done.Add(pair.Value);
+                if (result.Failures.Count == 0) done.Add(to);
                 else problems.Add($"{Path.GetFileName(pair.Key)}: {result.Failures[0].Error.Message}");
             }
             catch (PdmException ex)

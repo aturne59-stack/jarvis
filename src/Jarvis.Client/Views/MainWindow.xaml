@@ -320,7 +320,7 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="230" />
-                    <DataGridTextColumn Header="Part Number" Binding="{Binding PartNumber}" Width="100">
+                    <DataGridTextColumn x:Name="PartNumberColumn" Header="Part Number" Binding="{Binding PartNumber}" Width="100">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>

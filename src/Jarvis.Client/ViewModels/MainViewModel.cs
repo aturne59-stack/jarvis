@@ -623,6 +623,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void Apply(VaultSnapshot snapshot)
     {
+        NameIsNumber = _vault?.LoadNumbering()?.NameIsNumber == true;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in snapshot.Files)
         {
