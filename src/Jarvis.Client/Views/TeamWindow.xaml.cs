@@ -151,7 +151,8 @@ public partial class TeamWindow : Window
         var lines = new List<string>();
         if (invited.Count > 0)
         {
-            lines.Add($"Invited {string.Join(", ", invited)}. GitHub emailed them; click \"Copy welcome message\" and send them the steps.");
+            lines.Add($"Invited {string.Join(", ", invited)}. GitHub emailed them a link to the vault, whose page shows how to get Jarvis and join. " +
+                      "(To send the steps yourself too, click \"Copy welcome message\".)");
         }
         if (problems.Count > 0) lines.Add("Couldn't add:\n" + string.Join("\n", problems));
         if (lines.Count == 0) lines.Add("They already have access.");

@@ -1825,6 +1825,10 @@ public sealed partial class VaultService : IVaultService
         {
             problems.Add("The vault isn't set up to store 3D previews efficiently.");
         }
+        if (await ReadVaultTextAsync(VaultSetup.ReadmePath, ct).ConfigureAwait(false) == null)
+        {
+            problems.Add("The vault's GitHub page doesn't show new teammates how to get Jarvis and join.");
+        }
         return problems;
     }
 
@@ -1872,12 +1876,13 @@ public sealed partial class VaultService : IVaultService
                 var separator = attributes.Length == 0 || attributes.EndsWith("\n", StringComparison.Ordinal) ? "" : "\n";
                 File.WriteAllText(attributesFile, attributes + separator + "\n# 3D previews made by the SolidWorks add-in\n" + VaultSetup.PreviewAttributesRule + "\n");
             }
+            WriteVaultText(VaultSetup.ReadmePath, VaultSetup.Readme(Config.VaultName, Config.LocalPath));
 
-            await CommitAndPushAsync(new[] { VaultSetup.GuardWorkflowPath, VaultSetup.GuardScriptPath, VaultSetup.AttributesPath },
-                "Updated vault setup (vault guard, 3D preview storage)", progress, ct).ConfigureAwait(false);
+            await CommitAndPushAsync(new[] { VaultSetup.GuardWorkflowPath, VaultSetup.GuardScriptPath, VaultSetup.AttributesPath, VaultSetup.ReadmePath },
+                "Updated vault setup (vault guard, 3D preview storage, joining steps)", progress, ct).ConfigureAwait(false);
             result.Succeeded.Add(VaultSetup.GuardWorkflowPath);
             result.Notes.Add("The vault guard is installed. From now on GitHub checks every push and undoes ones that break the vault rules " +
-                             "(you'll see runs under the repo's Actions tab).");
+                             "(you'll see runs under the repo's Actions tab). The vault's GitHub page shows new teammates how to get Jarvis and join.");
             return result;
         }
         finally

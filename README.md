@@ -139,7 +139,7 @@ All in the app, no scripts or GitHub settings pages:
    - the **vault folder**, the same on every PC (e.g. `C:\ClubVault`; keep it outside OneDrive).
    
    The app creates a **private** GitHub repo with the starting folders you tick (**COTS** for purchased parts and **Sandbox** for trying things out, both ticked by default; rename them or add more), puts in the vault rules (`.gitattributes`, `.gitignore`), the team settings (`pdm.json` with your name, folder and version) and the vault guard, downloads it to the folder and opens it. If the upload fails halfway, fix the problem and click **Create vault** again: it reuses the empty repo. It never deletes anything on GitHub.
-3. **Add your teammates:** click **Team** in the command bar (offered right after creating the vault too; also **Vaults** → select the vault → **Team…**). Type their GitHub usernames and click **Add to team**: GitHub emails each one an invitation, and they get **Write** access (check out and check in). Misspelled names and people without a GitHub account are listed so you can fix them. Then click **Copy welcome message** and send it on Discord or by email: one link to `Jarvis.exe` (with "Windows may warn you: More info → Run anyway"), then sign in and **Accept and download** on the welcome screen.
+3. **Add your teammates:** click **Team** in the command bar (offered right after creating the vault too; also **Vaults** → select the vault → **Team…**). Type their GitHub usernames and click **Add to team**: GitHub emails each one an invitation, and they get **Write** access (check out and check in). Misspelled names and people without a GitHub account are listed so you can fix them. GitHub's email links to the vault's GitHub page, which shows the steps (Jarvis writes them to `.github/README.md`): one link to `Jarvis.exe` (with "Windows may warn you: More info → Run anyway"), then sign in and **Accept and download** on the welcome screen. So there's nothing else to send; **Copy welcome message** gives the same steps to paste into Discord or a text if you want to. Vaults made before Jarvis 0.8.1 get the page with **Update Vault Setup**.
 
    The Team window also shows everyone who has access, invitations not accepted yet (**Cancel invite**; GitHub invitations expire after 7 days, so add them again if needed), and **Remove** for people who leave. Anyone on the team can see the list; only the repo's **Admin** role can add or remove people.
 4. Optionally edit `pdm.json` in the vault and check it in:
@@ -262,7 +262,7 @@ The PDM itself works with any version, and the add-in supports SolidWorks 2020 a
 The tool isn't tied to the capstone, and nothing in Jarvis.exe names a team. For a new team (a club, another class):
 
 1. The team lead clicks **Vaults** → **New team vault…** (see *First-time vault setup*), e.g. "Club Vault" in `C:\ClubVault`. The folder is saved in the vault's `pdm.json` as `localPath`, so everyone who downloads it gets the same folder.
-2. Click **Team**, add your teammates' GitHub usernames, and send them the welcome message.
+2. Click **Team** and add your teammates' GitHub usernames. GitHub's invitation leads them to the vault's page with the steps to join.
 3. Members who already have Jarvis: **Vaults** → **Find my vaults** → pick the vault → **Download and open**. New members download the same `Jarvis.exe`, install it, and accept the invitation on the welcome screen.
 
 The vault guard is included from the start. `Setup-Jarvis.ps1 -RepoUrl <url> -VaultPath <folder>` still downloads a vault during setup if you want that.

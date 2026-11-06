@@ -57,6 +57,27 @@ public static class VaultInvites
     public static string? InstallLink(string? updateRepo) =>
         string.IsNullOrWhiteSpace(updateRepo) ? null : $"https://github.com/{updateRepo}/releases/latest/download/Jarvis.exe";
 
+    /// <summary>
+    /// The vault's GitHub page (.github/README.md): the same steps as <see cref="Message"/>, for new teammates who
+    /// follow GitHub's invitation email there, so admins don't have to send them anything else.
+    /// </summary>
+    public static string Readme(string vaultName, string? localPath, string? installLink)
+    {
+        var download = installLink == null ? "Ask an admin for Jarvis.exe" : $"Download [Jarvis.exe]({installLink})";
+        var folder = string.IsNullOrWhiteSpace(localPath) ? "the same folder" : $"`{localPath}`";
+        return
+            $"# {vaultName}\n\n" +
+            "Our team's SolidWorks files, kept with Jarvis (a free PDM). Don't download or edit files here on GitHub: Jarvis checks files out and in " +
+            "and keeps everyone's copy up to date.\n\n" +
+            "## Joining the team\n\n" +
+            $"1. **Get Jarvis.** {download} and open it. Windows may warn you: click **More info**, then **Run anyway**. Then click **Install Jarvis**. " +
+            "(Already have Jarvis? Skip this.)\n" +
+            "2. **Sign in.** Jarvis asks you to sign in to GitHub: use the account this invitation went to. No account yet? Make a free one at github.com and send an admin your username.\n" +
+            $"3. **Get the vault.** Next to **{vaultName}**, click **Accept and download**. (Already accepted the invitation here on GitHub? Click **Find my vaults** instead.)\n\n" +
+            $"The vault goes to {folder} on every PC so assemblies find their parts. Always open SolidWorks files from there, and check out before editing.\n\n" +
+            "_Written by Jarvis. An admin's **Update Vault Setup** writes it again._\n";
+    }
+
     /// <summary>What an admin sends new teammates (Discord, email, ...).</summary>
     public static string Message(string vaultName, string repoFullName, string localPath, string? installLink)
     {

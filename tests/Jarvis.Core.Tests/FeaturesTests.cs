@@ -109,6 +109,28 @@ public class FeaturesTests
         Assert.Equal("https://www.mcmaster.com/91251A540/", McMaster.PageUrl("91251A540"));
     }
 
+    // ------------------------------------------------------------ joining steps on the vault's GitHub page
+
+    [Fact]
+    public void NewVault_GitHubPage_ShowsHowToJoin()
+    {
+        var files = VaultCreator.TemplateFiles("Club Vault", @"C:\ClubVault", 2024);
+
+        var readme = files[".github/README.md"];
+        Assert.StartsWith("# Club Vault", readme);
+        Assert.Contains("Install Jarvis", readme);
+        Assert.Contains("Accept and download", readme);
+        Assert.Contains(@"`C:\ClubVault`", readme);
+    }
+
+    [Fact]
+    public void JoiningSteps_LinkTheLatestJarvis()
+    {
+        var readme = VaultInvites.Readme("Club Vault", @"C:\ClubVault", VaultInvites.InstallLink("team/jarvis"));
+        Assert.Contains("[Jarvis.exe](https://github.com/team/jarvis/releases/latest/download/Jarvis.exe)", readme);
+        Assert.Contains("Ask an admin for Jarvis.exe", VaultInvites.Readme("Club Vault", null, null));
+    }
+
     // ------------------------------------------------------------ starting folders
 
     [Fact]
