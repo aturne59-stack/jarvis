@@ -72,4 +72,13 @@ public interface IDialogs
     string? AskFolder(string title, string vaultName, IReadOnlyList<string> folders, string? current, System.Func<string, string, string> createFolder);
     /// <summary>Export: where to and how (<paramref name="what"/> names the chosen files). Null if cancelled.</summary>
     ExportOptions? AskExport(string what, string defaultName);
+    /// <summary>Picks a folder on this PC (outside the vault). Null if cancelled.</summary>
+    string? AskFolderOnDisk(string title);
+    /// <summary>
+    /// The import table (the same as the SolidWorks pane's): each file's group or ours/COTS, name and description.
+    /// Returns what to import, or null if cancelled.
+    /// </summary>
+    IReadOnlyList<(Jarvis.Core.Vault.ImportItem Item, string? PartNumber, string Description)>? AskImport(IReadOnlyList<(string Path, bool FromElsewhere)> files, string sourceFolder,
+        Jarvis.Core.Vault.NumberingScheme? scheme, IReadOnlyList<string> used, IReadOnlyList<string> vaultFolders, System.Func<string, bool> existsInVault,
+        System.Func<string, (string RelativePath, bool Identical)?> vaultMatch);
 }

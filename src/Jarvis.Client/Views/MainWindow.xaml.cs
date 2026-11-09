@@ -150,6 +150,31 @@ public partial class MainWindow : Window, IDialogs
         return dialog.ShowDialog() == true ? dialog.Value : null;
     }
 
+    public string? AskFolderOnDisk(string title)
+    {
+        var picker = new Microsoft.Win32.OpenFolderDialog { Title = title };
+        return picker.ShowDialog(this) == true ? picker.FolderName : null;
+    }
+
+    public IReadOnlyList<(Jarvis.Core.Vault.ImportItem Item, string? PartNumber, string Description)>? AskImport(IReadOnlyList<(string Path, bool FromElsewhere)> files, string sourceFolder,
+        Jarvis.Core.Vault.NumberingScheme? scheme, IReadOnlyList<string> used, IReadOnlyList<string> vaultFolders, Func<string, bool> existsInVault,
+        Func<string, (string RelativePath, bool Identical)?> vaultMatch)
+    {
+        // The SolidWorks pane's import table (Windows Forms), owned by this window.
+        System.Windows.Forms.Application.EnableVisualStyles();
+        using var form = new Jarvis.SwAddin.ImportForm(files, sourceFolder, scheme, used, vaultFolders, existsInVault, vaultMatch);
+        var owner = new System.Windows.Forms.NativeWindow();
+        owner.AssignHandle(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+        try
+        {
+            return form.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK ? form.Result : null;
+        }
+        finally
+        {
+            owner.ReleaseHandle();
+        }
+    }
+
     public ExportOptions? AskExport(string what, string defaultName)
     {
         var dialog = new ExportWindow(what, defaultName) { Owner = this };

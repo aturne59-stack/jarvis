@@ -53,6 +53,7 @@ public sealed partial class MainViewModel : ViewModelBase
         InitializeFolderCommands();
         InitializeExportCommands();
         InitializeDescriptionCommands();
+        InitializeImportCommands();
         InitializeDeleteCommands();
         InitializeNumberingCommands();
         HistoryCommand = new RelayCommand(ShowHistory, () => _vault != null && SingleSelected?.File.State is not (null or FileState.NotInVault));
