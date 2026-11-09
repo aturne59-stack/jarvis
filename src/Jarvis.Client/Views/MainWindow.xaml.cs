@@ -213,6 +213,62 @@ public partial class MainWindow : Window, IDialogs
     public void ShowTeam(string vaultName, string? remoteUrl, string localPath, IReadOnlyDictionary<string, string> displayNames) =>
         new TeamWindow(vaultName, remoteUrl, localPath, displayNames) { Owner = this }.ShowDialog();
 
+    // ------------------------------------------------------------ updates
+
+    /// <summary>How often an open Jarvis looks for a new version (and once more after the PC wakes up).</summary>
+    private static readonly TimeSpan UpdateCheckEvery = TimeSpan.FromHours(3);
+
+    private Jarvis.Core.Updates.ReleaseInfo? _update;
+    private System.Windows.Threading.DispatcherTimer? _updateTimer;
+
+    /// <summary>Shows the toolbar's Update button for a newer version.</summary>
+    public void ShowUpdate(Jarvis.Core.Updates.ReleaseInfo release)
+    {
+        _update = release;
+        UpdateLabel.Text = "Update to " + release.Version.ToString(3);
+        UpdateButton.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Checks for a new version every few hours, and a minute after the PC wakes up, without interrupting anyone.</summary>
+    public void StartUpdateChecks()
+    {
+        _updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = UpdateCheckEvery };
+        _updateTimer.Tick += async (_, _) => await CheckForUpdateAsync();
+        _updateTimer.Start();
+        Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        Closed += (_, _) => Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+    }
+
+    private void OnPowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != Microsoft.Win32.PowerModes.Resume) return;
+        // Give the network a minute to come back.
+        Dispatcher.InvokeAsync(async () =>
+        {
+            await System.Threading.Tasks.Task.Delay(TimeSpan.FromMinutes(1));
+            await CheckForUpdateAsync();
+        });
+    }
+
+    private async System.Threading.Tasks.Task CheckForUpdateAsync()
+    {
+        if (await Services.AppUpdater.FindNewerAsync() is { } release) ShowUpdate(release);
+    }
+
+    private async void OnUpdate(object sender, RoutedEventArgs e)
+    {
+        if (_update == null || !Services.AppUpdater.AskToUpdate(this, _update)) return;
+        UpdateButton.IsEnabled = false;
+        try
+        {
+            await Services.AppUpdater.InstallAsync(this, _update);
+        }
+        finally
+        {
+            UpdateButton.IsEnabled = true; // only if the update didn't go ahead (it restarts the app when it does)
+        }
+    }
+
     private void OnHelp(object sender, RoutedEventArgs e) => new HelpWindow { Owner = this }.Show();
 
     public void ShowMilestones() => new MilestonesWindow(_vm, this) { Owner = this }.ShowDialog();

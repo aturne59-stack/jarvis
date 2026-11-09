@@ -11,9 +11,10 @@ using Jarvis.Core.Updates;
 namespace Jarvis.Client.Services;
 
 /// <summary>
-/// Checks GitHub Releases at startup. When there's a newer version it asks, downloads the exe (and the
-/// SolidWorks add-in if it's installed), checks both against the release's SHA256SUMS, swaps the exe
-/// and restarts. Only the copy in the install folder updates itself, not a development build or a download.
+/// Checks GitHub Releases at startup (and every few hours while open, for the toolbar's Update button). When there's
+/// a newer version it asks, downloads the exe (and the SolidWorks add-in if it's installed), checks both against the
+/// release's SHA256SUMS, swaps the exe and restarts. Only the copy in the install folder updates itself, not a
+/// development build or a download.
 /// </summary>
 public static class AppUpdater
 {
@@ -31,14 +32,39 @@ public static class AppUpdater
         }
     }
 
-    public static async Task CheckAsync(Window owner)
+    /// <summary>The updater for this copy, or null when it doesn't update itself (a development build, or not the installed copy).</summary>
+    private static Updater? ForThisCopy()
     {
         var exe = Environment.ProcessPath;
-        var assembly = Assembly.GetExecutingAssembly();
-        var repo = Updater.BuiltInRepo(assembly);
-        if (exe == null || repo == null || AppInstaller.IsDevelopmentBuild(exe) || !AppInstaller.IsInstalled(exe, InstallLayout.ForThisUser())) return;
+        var repo = Updater.BuiltInRepo(Assembly.GetExecutingAssembly());
+        if (exe == null || repo == null || AppInstaller.IsDevelopmentBuild(exe) || !AppInstaller.IsInstalled(exe, InstallLayout.ForThisUser())) return null;
+        return new Updater(repo);
+    }
 
-        var updater = new Updater(repo);
+    private static Version Current => Updater.CurrentVersion(Assembly.GetExecutingAssembly());
+
+    /// <summary>A newer Jarvis this copy can update to, or null (up to date, offline, or a copy that doesn't update itself). Never asks anything.</summary>
+    public static async Task<ReleaseInfo?> FindNewerAsync()
+    {
+        if (ForThisCopy() is not { } updater) return null;
+        try
+        {
+            var release = await updater.GetLatestAsync();
+            return release != null && release.Version > Current && release.Find(Updater.AppAsset) != null ? release : null;
+        }
+        catch (Exception)
+        {
+            return null; // Offline or a GitHub hiccup: the next check tries again.
+        }
+    }
+
+    /// <summary>
+    /// At startup: offers a newer version (or a matching add-in). Returns the newer release when the user said
+    /// Not now, so the toolbar can keep offering it; null otherwise.
+    /// </summary>
+    public static async Task<ReleaseInfo?> CheckAsync(Window owner)
+    {
+        if (ForThisCopy() is not { } updater) return null;
         ReleaseInfo? release;
         try
         {
@@ -46,23 +72,35 @@ public static class AppUpdater
         }
         catch (Exception)
         {
-            return; // Offline or GitHub hiccup: try again next start.
+            return null; // Offline or GitHub hiccup: the next check tries again.
         }
-        var current = Updater.CurrentVersion(assembly);
-        if (release == null) return;
+        var current = Current;
+        if (release == null) return null;
         if (release.Version <= current || release.Find(Updater.AppAsset) == null)
         {
             await OfferAddinUpdateAsync(owner, updater, release, current);
-            return;
+            return null;
         }
+        if (!AskToUpdate(owner, release)) return release;
+        await InstallAsync(owner, release);
+        return release; // only reached if the update failed: keep offering it
+    }
 
+    /// <summary>"Jarvis 0.8.5 is available... Update now?" with what's new. True for yes.</summary>
+    public static bool AskToUpdate(Window owner, ReleaseInfo release)
+    {
         var notes = Updater.WhatsNew(release.Notes);
-        var answer = MessageBox.Show(owner,
-            $"Jarvis {release.Version.ToString(3)} is available (you have {current.ToString(3)}).\n\n" +
+        return MessageBox.Show(owner,
+            $"Jarvis {release.Version.ToString(3)} is available (you have {Current.ToString(3)}).\n\n" +
             (notes.Length > 0 ? notes + "\n\n" : "") + "Update now? It takes about a minute and the app restarts.",
-            "Update available", MessageBoxButton.YesNo, MessageBoxImage.Information);
-        if (answer != MessageBoxResult.Yes) return;
+            "Update available", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes;
+    }
 
+    /// <summary>Downloads and checks the new version (and the add-in), swaps the exe and restarts. Shows what went wrong if it can't.</summary>
+    public static async Task InstallAsync(Window owner, ReleaseInfo release)
+    {
+        var exe = Environment.ProcessPath;
+        if (exe == null || ForThisCopy() is not { } updater) return;
         var folder = Path.Combine(Path.GetTempPath(), "Jarvis-update-" + release.Version);
         try
         {

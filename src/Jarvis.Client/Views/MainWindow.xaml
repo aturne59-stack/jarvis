@@ -100,7 +100,14 @@
                         <TextBlock Style="{StaticResource ToolLabel}" Text="McMaster" />
                     </StackPanel>
                 </Button>
-                <Button AutomationProperties.Name="Help" Click="OnHelp" ToolTip="Common problems (conflicts, files edited without check-out, missing parts...) and how to fix them.">
+                <Button x:Name="UpdateButton" AutomationProperties.Name="Update Jarvis" Click="OnUpdate" Visibility="Collapsed" ToolBar.OverflowMode="Never"
+                        ToolTip="A newer version of Jarvis is ready. It takes about a minute and the app restarts (the SolidWorks add-in updates too).">
+                    <StackPanel MinWidth="70">
+                        <TextBlock Style="{StaticResource ToolGlyph}" Text="&#xE896;" Foreground="#2563EB" />
+                        <TextBlock x:Name="UpdateLabel" Style="{StaticResource ToolLabel}" Text="Update" Foreground="#2563EB" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <Button AutomationProperties.Name="Help" Click="OnHelp" ToolBar.OverflowMode="Never" ToolTip="Common problems (conflicts, files edited without check-out, missing parts...) and how to fix them.">
                     <StackPanel MinWidth="50">
                         <TextBlock Style="{StaticResource ToolGlyph}" Text="&#xE897;" />
                         <TextBlock Style="{StaticResource ToolLabel}" Text="Help" />

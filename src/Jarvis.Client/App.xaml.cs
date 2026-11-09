@@ -71,7 +71,9 @@ public partial class App : Application
         window.Show();
         ExplorerCleanup.RemoveOldIntegration();
         AppUpdater.CleanUpAfterUpdate();
-        await AppUpdater.CheckAsync(window);
+        // Said Not now? The toolbar keeps an Update button, and the window checks again every few hours.
+        if (await AppUpdater.CheckAsync(window) is { } declined) window.ShowUpdate(declined);
+        window.StartUpdateChecks();
     }
 
     /// <summary>Shows the Install window when this exe isn't the installed copy. True if it did (this copy should quit).</summary>
