@@ -52,6 +52,7 @@ public sealed partial class MainViewModel : ViewModelBase
         DeleteLocalCommand = new RelayCommand(async () => await DeleteLocalAsync(), () => CanEdit && DeleteLocalTargets().Count > 0);
         InitializeFolderCommands();
         InitializeExportCommands();
+        InitializeDescriptionCommands();
         InitializeDeleteCommands();
         InitializeNumberingCommands();
         HistoryCommand = new RelayCommand(ShowHistory, () => _vault != null && SingleSelected?.File.State is not (null or FileState.NotInVault));
@@ -1070,7 +1071,14 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Runs a vault command with busy state and error dialogs, then refreshes the view.</summary>
     private async Task RunAsync(string busyText, Func<VaultService, IProgress<string>, Task<string>> operation)
     {
-        if (_vault == null || IsBusy) return;
+        // The background refresh can start while a dialog is open: wait for it, rather than dropping what the user just confirmed.
+        for (var waited = 0; IsBusy && waited < 1200; waited++) await Task.Delay(100);
+        if (_vault == null) return;
+        if (IsBusy)
+        {
+            StatusText = "Jarvis is still busy. Try again in a moment.";
+            return;
+        }
         IsBusy = true;
         StatusText = busyText;
         var progress = new Progress<string>(s => StatusText = s);

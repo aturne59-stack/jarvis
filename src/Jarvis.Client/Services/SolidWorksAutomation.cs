@@ -148,6 +148,48 @@ internal sealed class SolidWorksAutomation : IReferenceEditor, IDisposable
         // Nothing was closed, so there's nothing to reopen.
     }
 
+    /// <summary>
+    /// Writes file-level custom properties (e.g. Description) into a SolidWorks file: opens it hidden, sets them,
+    /// saves and closes it. Refuses a file that's open in SolidWorks, which would save the user's unsaved changes too.
+    /// </summary>
+    public void SetProperties(string fullPath, IReadOnlyDictionary<string, string> properties)
+    {
+        if (IsOpenInSolidWorks(fullPath) || FileUtil.IsInUse(fullPath))
+        {
+            throw new FileInUseException(new[] { fullPath }, "Close it in SolidWorks, then try again.");
+        }
+        var type = Path.GetExtension(fullPath).ToUpperInvariant() switch { ".SLDPRT" => 1, ".SLDASM" => 2, ".SLDDRW" => 3, _ => 0 };
+        if (type == 0) throw new PdmException($"{Path.GetFileName(fullPath)} isn't a SolidWorks file.");
+        Call("DocumentVisible", false, type);
+        object? doc;
+        var openArgs = new object?[] { fullPath, type, 1 /* silent */, "", 0, 0 };
+        try
+        {
+            doc = _sw!.GetType().InvokeMember("OpenDoc6", BindingFlags.InvokeMethod, null, _sw, openArgs, new[] { new ParameterModifier(6) { [4] = true, [5] = true } }, null, null);
+        }
+        finally
+        {
+            Call("DocumentVisible", true, type);
+        }
+        if (doc == null) throw new PdmException($"SolidWorks couldn't open {Path.GetFileName(fullPath)} (error {openArgs[4]}).");
+        try
+        {
+            var extension = doc.GetType().InvokeMember("Extension", BindingFlags.GetProperty, null, doc, null)!;
+            var manager = extension.GetType().InvokeMember("CustomPropertyManager", BindingFlags.GetProperty, null, extension, new object[] { "" })!;
+            foreach (var property in properties)
+            {
+                manager.GetType().InvokeMember("Add3", BindingFlags.InvokeMethod, null, manager, new object[] { property.Key, 30 /* text */, property.Value, 2 /* replace the value */ });
+            }
+            var saveArgs = new object?[] { 1 /* silent */, 0, 0 };
+            var saved = doc.GetType().InvokeMember("Save3", BindingFlags.InvokeMethod, null, doc, saveArgs, new[] { new ParameterModifier(3) { [1] = true, [2] = true } }, null, null);
+            if (saved is not true) throw new PdmException($"SolidWorks couldn't save {Path.GetFileName(fullPath)} (error {saveArgs[1]}).");
+        }
+        finally
+        {
+            Call("CloseDoc", fullPath);
+        }
+    }
+
     private bool IsOpenInSolidWorks(string fullPath)
     {
         try

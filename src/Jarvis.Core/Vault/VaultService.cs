@@ -351,6 +351,25 @@ public sealed partial class VaultService : IVaultService
     private static bool IsHidden(string path) =>
         path.Split('/').Any(segment => segment.StartsWith(".", StringComparison.Ordinal));
 
+    /// <summary>Files Jarvis writes itself (vault records and 3D previews), which it can always write again.</summary>
+    private static bool IsGenerated(string path) =>
+        path.StartsWith(VaultIndex.Folder, StringComparison.OrdinalIgnoreCase) || VaultPaths.IsPreview(path);
+
+    /// <summary>Puts a generated file back to the vault's version (or removes it if the vault doesn't have it yet).</summary>
+    private async Task DiscardGeneratedAsync(StatusEntry change, CancellationToken ct)
+    {
+        var full = ToFullPath(change.Path);
+        if (change.X is '?' or 'A')
+        {
+            await RunAsync(new[] { "rm", "--cached", "--quiet", "--ignore-unmatch", "--", change.Path }, ct).ConfigureAwait(false);
+            if (File.Exists(full)) File.Delete(full);
+            return;
+        }
+        FileUtil.SetReadOnly(full, false);
+        var restore = await RunAsync(new[] { "restore", "--source=HEAD", "--staged", "--worktree", "--", change.Path }, ct, TransferTimeout).ConfigureAwait(false);
+        if (!restore.Success) throw GitErrorClassifier.Classify(restore, "replace " + change.Path);
+    }
+
     // ---------------------------------------------------------------- Get Latest
 
     public async Task<GetLatestResult> GetLatestAsync(IProgress<string>? progress = null, CancellationToken ct = default)
@@ -388,6 +407,14 @@ public sealed partial class VaultService : IVaultService
         var incoming = await GetIncomingChangesAsync(ct).ConfigureAwait(false);
         var pins = PinnedVersions.Load(VaultRoot);
         var local = (await GetLocalChangesAsync(ct).ConfigureAwait(false)).Where(c => pins.Find(c.Path) == null).ToList();
+
+        // Records and 3D previews are made by Jarvis and can be made again, and they're hidden, so nobody could undo
+        // them: one changed on this PC (by a catch-up whose check-in didn't finish, say) never blocks Get Latest.
+        foreach (var change in local.Where(c => incoming.Contains(c.Path) && IsGenerated(c.Path)).ToList())
+        {
+            await DiscardGeneratedAsync(change, ct).ConfigureAwait(false);
+            local.Remove(change);
+        }
 
         // The promise: never overwrite a file you've changed. Git would refuse anyway, but we
         // check first so the message is clear and nothing is half-done.
