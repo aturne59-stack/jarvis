@@ -18,6 +18,9 @@ public partial class ErrorWindow : Window
         DetailsExpander.Visibility = string.IsNullOrWhiteSpace(error.Detail) ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    /// <summary>Help, already searched for this kind of error (all topics if none fits).</summary>
+    private void OnHelp(object sender, RoutedEventArgs e) => new HelpWindow(_error.Title) { Owner = this }.ShowDialog();
+
     private void OnCopy(object sender, RoutedEventArgs e) =>
         Clipboard.SetText($"{_error.Title}\n{_error.Message}\n\n{_error.Detail}".TrimEnd());
 

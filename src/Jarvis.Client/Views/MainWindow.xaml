@@ -100,6 +100,12 @@
                         <TextBlock Style="{StaticResource ToolLabel}" Text="McMaster" />
                     </StackPanel>
                 </Button>
+                <Button AutomationProperties.Name="Help" Click="OnHelp" ToolTip="Common problems (conflicts, files edited without check-out, missing parts...) and how to fix them.">
+                    <StackPanel MinWidth="50">
+                        <TextBlock Style="{StaticResource ToolGlyph}" Text="&#xE897;" />
+                        <TextBlock Style="{StaticResource ToolLabel}" Text="Help" />
+                    </StackPanel>
+                </Button>
                 <Separator Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}" />
                 <Button AutomationProperties.Name="Break Lock" Command="{Binding BreakLockCommand}"
                         Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}"

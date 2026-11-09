@@ -19,6 +19,8 @@
         </Expander>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Style="{StaticResource DialogButton}" Content="Help" Click="OnHelp"
+                    ToolTip="How to fix common problems like this one." />
             <Button Style="{StaticResource DialogButton}" Content="Copy" Click="OnCopy"
                     ToolTip="Copy the message and details, to paste into Discord when asking for help." />
             <Button Style="{StaticResource DialogButton}" Content="OK" IsDefault="True" IsCancel="True" Click="OnOk" />

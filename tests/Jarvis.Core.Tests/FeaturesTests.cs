@@ -109,6 +109,25 @@ public class FeaturesTests
         Assert.Equal("https://www.mcmaster.com/91251A540/", McMaster.PageUrl("91251A540"));
     }
 
+    // ------------------------------------------------------------ help
+
+    [Theory]
+    [InlineData("Conflict", "Conflict")]
+    [InlineData("edited without check-out", "WITHOUT check-out")]
+    [InlineData("File in use", "File in use")]
+    [InlineData("backups", "backups")]
+    public void Help_FindsTheTopicForAMessage(string search, string inTitle)
+    {
+        Assert.Contains(Jarvis.Core.Help.HelpTopics.All.Where(t => t.Matches(search)), t => t.Title.IndexOf(inTitle, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    [Fact]
+    public void Help_EveryTopicHasSteps()
+    {
+        Assert.All(Jarvis.Core.Help.HelpTopics.All, t => Assert.NotEmpty(t.Steps));
+        Assert.DoesNotContain(Jarvis.Core.Help.HelpTopics.All, t => t.Matches("zzzz qqqq"));
+    }
+
     // ------------------------------------------------------------ joining steps on the vault's GitHub page
 
     [Fact]

@@ -112,7 +112,7 @@ A **read-only file means you haven't checked it out.** Don't clear the read-only
 
 ### When something goes wrong
 
-Every error window has a **Copy** button. Paste the text into Discord when asking for help.
+Click **Help** (in the app's toolbar or the SolidWorks pane) for the common problems and the steps that fix them; every error window has a **Help** button that opens the right one. Every error window also has a **Copy** button: paste the text into Discord when asking for help.
 
 | Message | What it means / what to do |
 |---|---|

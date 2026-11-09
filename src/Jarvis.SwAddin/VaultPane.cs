@@ -67,6 +67,7 @@ internal sealed class VaultPane : UserControl
     private readonly ModernButton _import;
     private readonly ModernButton _refresh;
     private readonly ModernButton _openApp;
+    private readonly ModernButton _help;
     private readonly CaptionLabel _status;
     private readonly ActivityBar _activity;
 
@@ -139,6 +140,7 @@ internal sealed class VaultPane : UserControl
         _import = new ModernButton("Import files\u2026", "\uE8B5");
         _refresh = new ModernButton("Refresh", "");
         _openApp = new ModernButton("Open Jarvis", "");
+        _help = new ModernButton("Help", "\uE897");
         _exportBom = new ModernButton("Export BOM (Excel)", "\uE9F9");
         _status = new CaptionLabel();
         _activity = new ActivityBar();
@@ -148,7 +150,7 @@ internal sealed class VaultPane : UserControl
             _header, _picker, _activity, _status, _banner, _card, _treeLabel, _tree,
             _downloadRefs, _checkIn, _checkOut, _undo, _watch, _approveReview, _rejectReview, _withdrawReview, _submitReview, _rename, _requestCheckIn, _freeze, _unfreeze,
             new Divider(),
-            _getLatest, _refresh, _import, _exportBom, _openApp,
+            _getLatest, _refresh, _import, _exportBom, _openApp, _help,
             // Which add-in this is, so it can be compared with the app (it updates along with it).
             new CaptionLabel("Jarvis add-in " + Jarvis.Core.Updates.Updater.CurrentVersion(typeof(VaultPane).Assembly).ToString(3)),
         });
@@ -172,6 +174,7 @@ internal sealed class VaultPane : UserControl
         _refresh.Click += async (_, _) => { EnsureUiContext(); await RefreshAsync(contactVault: true); };
         _import.Click += async (_, _) => { EnsureUiContext(); await ImportAsync(); };
         _openApp.Click += (_, _) => OpenDesktopApp();
+        _help.Click += (_, _) => { using var help = new HelpForm(); help.ShowDialog(_sw.MainWindow); };
         _exportBom.Click += (_, _) => ExportBom();
         _timer.Tick += async (_, _) => await OnTickAsync();
 
