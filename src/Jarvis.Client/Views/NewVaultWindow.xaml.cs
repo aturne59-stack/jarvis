@@ -71,7 +71,7 @@ public partial class NewVaultWindow : Window
         DockPanel.SetDock(nameBox, Dock.Left);
         row.Children.Add(box);
         row.Children.Add(nameBox);
-        row.Children.Add(new TextBlock { Text = hint, Foreground = System.Windows.Media.Brushes.Gray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        row.Children.Add(new TextBlock { Text = hint, Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         row.Tag = (box, nameBox);
         FoldersPanel.Children.Add(row);
     }

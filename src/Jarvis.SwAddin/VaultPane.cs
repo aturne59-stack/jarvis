@@ -1714,10 +1714,23 @@ internal sealed class VaultPane : UserControl
         {
             var editor = new AddinReferenceEditor(_sw, this, storedPaths: true);
             AddinLog.Write($"Import from {source}: {plan.Count} file(s), e.g. {plan[0].Item.Target}");
+            // Vault files this import updates with someone's newer copy: checked out to you first, like any edit.
+            var updates = plan.Where(p => p.Item.ReplaceExisting).Select(p => p.Item.Target).ToList();
+            await vault.CheckOutForImportAsync(updates, progress);
             // Copying and repointing run off the UI thread; the editor sends each SolidWorks call back to it.
-            var copies = await Task.Run(() => VaultImport.CopyAndRepoint(vault.VaultRoot, plan.Select(p => p.Item).ToList(), editor, progress));
+            IReadOnlyList<string> copies;
+            try
+            {
+                copies = await Task.Run(() => VaultImport.CopyAndRepoint(vault.VaultRoot, plan.Select(p => p.Item).ToList(), editor, progress));
+            }
+            catch
+            {
+                // The vault's files are back as they were: release them again.
+                if (updates.Count > 0) await vault.UndoCheckOutAsync(updates, progress);
+                throw;
+            }
             var copyOf = plan.ToDictionary(p => p.Item.Source, p => vault.ToFullPath(p.Item.Target), StringComparer.OrdinalIgnoreCase);
-            foreach (var (item, partNumber, description) in plan.Where(p => !p.Item.UseExisting))
+            foreach (var (item, partNumber, description) in plan.Where(p => !p.Item.UseExisting && !p.Item.ReplaceExisting))
             {
                 var copy = copyOf[item.Source];
                 if (!IsSolidWorksFile(copy) || (partNumber == null && description.Length == 0)) continue;
@@ -1743,7 +1756,7 @@ internal sealed class VaultPane : UserControl
 
             AddinLog.Write("Import: checking in");
             if (copies.Count == 0) return "Nothing to import: the vault already has every one of those files.";
-            var result = await vault.CheckInAsync(copies, $"Imported {copies.Count} file(s) from {Path.GetFileName(source)}", false, progress,
+            var result = await vault.CheckInAsync(copies, VaultImport.CheckInComment(copies.Count - updates.Count, updates.Count, Path.GetFileName(source)), false, progress,
                 indexUpdates: index, previews: previews);
             _sw.MakeReadOnly(result.Succeeded.Select(vault.ToFullPath));
             if (result.Failures.Count > 0)

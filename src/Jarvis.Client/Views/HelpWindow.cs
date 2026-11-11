@@ -15,7 +15,7 @@ internal sealed class HelpWindow : Window
 {
     private readonly TextBox _search = new TextBox { Padding = new Thickness(6, 4, 6, 4) };
     private readonly StackPanel _topics = new StackPanel();
-    private readonly TextBlock _none = new TextBlock { Text = "Nothing matches. Try fewer words.", Foreground = Brushes.DimGray, Margin = new Thickness(4, 8, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly TextBlock _none = new TextBlock { Text = "Nothing matches. Try fewer words.", Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush"), Margin = new Thickness(4, 8, 0, 0), Visibility = Visibility.Collapsed };
 
     /// <param name="search">Words to search for straight away (e.g. an error's title); ignored if nothing matches them.</param>
     public HelpWindow(string? search = null)
@@ -45,7 +45,7 @@ internal sealed class HelpWindow : Window
         header.Children.Add(new TextBlock
         {
             Text = "Common problems and how to fix them. Click one to see the steps, or search for words from the message you got.",
-            TextWrapping = TextWrapping.Wrap, Foreground = Brushes.DimGray, Margin = new Thickness(0, 0, 0, 8),
+            TextWrapping = TextWrapping.Wrap, Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush"), Margin = new Thickness(0, 0, 0, 8),
         });
         header.Children.Add(_search);
         var list = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };

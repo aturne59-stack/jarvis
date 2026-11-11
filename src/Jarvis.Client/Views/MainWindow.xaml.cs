@@ -18,11 +18,167 @@ public partial class MainWindow : Window, IDialogs
         InitializeComponent();
         _vm = new MainViewModel(this);
         DataContext = _vm;
-        // Grid columns aren't in the visual tree, so this one's visibility can't be bound.
+        // Grid columns aren't in the visual tree, so their visibility can't be bound.
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.NameIsNumber)) PartNumberColumn.Visibility = _vm.NameIsNumber ? Visibility.Collapsed : Visibility.Visible;
+            if (e.PropertyName == nameof(MainViewModel.NameIsNumber)) ApplyColumns();
         };
+        var settings = Jarvis.Core.Config.UserSettings.Load();
+        _hiddenColumns = new HashSet<string>(settings.HiddenColumns ?? (IEnumerable<string>)DefaultHiddenColumns, StringComparer.OrdinalIgnoreCase);
+        _compactRows = settings.CompactRows;
+        ApplyColumns();
+        ThemeManager.Changed += _vm.RefreshColors;
+        Closed += (_, _) => ThemeManager.Changed -= _vm.RefreshColors;
+    }
+
+    // ------------------------------------------------------------ columns (right-click a column header)
+
+    /// <summary>Out of the way until someone wants them: the list fits the window without scrolling sideways.</summary>
+    private static readonly string[] DefaultHiddenColumns = { "Checked Out By", "Since", "Last Check-In Comment", "Checked In By", "Checked In", "Material", "Folder" };
+    private const double RowHeight = 34, CompactRowHeight = 26;
+
+    private readonly HashSet<string> _hiddenColumns;
+    private bool _compactRows;
+
+    private void ApplyColumns()
+    {
+        foreach (var column in FilesGrid.Columns)
+        {
+            if (column.Header is not string header) continue;
+            // With file names that are the part numbers, a Part Number column would only repeat the name.
+            var hidden = _hiddenColumns.Contains(header) || (column == PartNumberColumn && _vm.NameIsNumber);
+            column.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        }
+        FilesGrid.MinRowHeight = _compactRows ? CompactRowHeight : RowHeight;
+    }
+
+    private void SaveColumns()
+    {
+        var settings = Jarvis.Core.Config.UserSettings.Load();
+        settings.HiddenColumns = _hiddenColumns.OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList();
+        settings.CompactRows = _compactRows;
+        settings.Save();
+    }
+
+    /// <summary>Right-click on a column header: choose the columns. Anywhere else in the list: the file menu.</summary>
+    private void OnGridContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var element = e.OriginalSource as DependencyObject;
+        while (element != null && element is not System.Windows.Controls.Primitives.DataGridColumnHeader && element is not DataGridRow)
+        {
+            element = element is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? System.Windows.Media.VisualTreeHelper.GetParent(element) : LogicalTreeHelper.GetParent(element);
+        }
+        if (element is not System.Windows.Controls.Primitives.DataGridColumnHeader) return;
+        e.Handled = true;
+
+        var menu = new ContextMenu { PlacementTarget = FilesGrid, Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
+        foreach (var column in FilesGrid.Columns)
+        {
+            if (column.Header is not string header || header == "Name" || (column == PartNumberColumn && _vm.NameIsNumber)) continue;
+            var item = new MenuItem { Header = header, IsCheckable = true, IsChecked = !_hiddenColumns.Contains(header), StaysOpenOnClick = true };
+            item.Click += (_, _) =>
+            {
+                if (item.IsChecked) _hiddenColumns.Remove(header);
+                else _hiddenColumns.Add(header);
+                ApplyColumns();
+                SaveColumns();
+            };
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var compact = new MenuItem { Header = "Compact rows", IsCheckable = true, IsChecked = _compactRows, StaysOpenOnClick = true, ToolTip = "Shorter rows, to see more files at once" };
+        compact.Click += (_, _) =>
+        {
+            _compactRows = compact.IsChecked;
+            ApplyColumns();
+            SaveColumns();
+        };
+        menu.Items.Add(compact);
+        var reset = new MenuItem { Header = "Reset columns" };
+        reset.Click += (_, _) =>
+        {
+            _hiddenColumns.Clear();
+            _hiddenColumns.UnionWith(DefaultHiddenColumns);
+            _compactRows = false;
+            ApplyColumns();
+            SaveColumns();
+        };
+        menu.Items.Add(reset);
+        menu.IsOpen = true;
+    }
+
+    // ------------------------------------------------------------ menus
+
+    /// <summary>The Admin button drops its menu down like a menu bar would.</summary>
+    private void OnAdminMenu(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button) return;
+        menu.DataContext = _vm;
+        menu.PlacementTarget = button;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// The file menu shows only what can be done with the selection: commands that can't run are left out (the three
+    /// everyday ones stay, greyed), a group with nothing to offer goes with them, and no separator is left dangling.
+    /// </summary>
+    private void OnFileMenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu) Tidy(menu.Items);
+    }
+
+    private static bool Tidy(ItemCollection items)
+    {
+        var any = false;
+        foreach (var entry in items)
+        {
+            if (entry is not MenuItem item) continue;
+            var show = item.HasItems ? Tidy(item.Items) : item.Tag as string == "keep" || (item.Command?.CanExecute(item.CommandParameter) ?? true);
+            item.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            any |= show;
+        }
+        // A separator stays only between two things that are showing.
+        var visible = items.OfType<Control>().ToList();
+        for (var i = 0; i < visible.Count; i++)
+        {
+            if (visible[i] is not Separator separator) continue;
+            var before = visible.Take(i).LastOrDefault(c => c is Separator || c.Visibility == Visibility.Visible);
+            var after = visible.Skip(i + 1).Any(c => c is MenuItem && c.Visibility == Visibility.Visible);
+            separator.Visibility = before is MenuItem && after ? Visibility.Visible : Visibility.Collapsed;
+        }
+        return any;
+    }
+
+    // ------------------------------------------------------------ keyboard
+
+    /// <summary>F1 Help, Ctrl+F to the search box, Esc clears the search. The rest are KeyBindings in the XAML.</summary>
+    private void OnWindowKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F1)
+        {
+            OnHelp(this, new RoutedEventArgs());
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            SearchBox.Focus();
+            SearchBox.SelectAll();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && SearchBox.IsKeyboardFocusWithin && SearchBox.Text.Length > 0)
+        {
+            SearchBox.Clear();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Enter opens the selected file (the grid would otherwise move to the next row).</summary>
+    private void OnGridKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || Keyboard.Modifiers != ModifierKeys.None || !_vm.OpenCommand.CanExecute(null)) return;
+        _vm.OpenCommand.Execute(null);
+        e.Handled = true;
     }
 
     /// <summary>Open the Vaults window once the vault is loaded.</summary>
@@ -124,13 +280,28 @@ public partial class MainWindow : Window, IDialogs
 
     // ------------------------------------------------------------ IDialogs
 
-    public void ShowError(PdmException error) => new ErrorWindow(error) { Owner = this }.ShowDialog();
+    public void ShowError(PdmException error)
+    {
+        Services.AppLog.Error(error);
+        new ErrorWindow(error) { Owner = this }.ShowDialog();
+    }
 
-    public void ShowMessage(string title, string message, bool isWarning) =>
-        MessageBox.Show(this, message, title, MessageBoxButton.OK, isWarning ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    public bool ShowErrorWithFix(PdmException error, string fixText, string fixToolTip)
+    {
+        Services.AppLog.Error(error);
+        var window = new ErrorWindow(error, fixText, fixToolTip) { Owner = this };
+        window.ShowDialog();
+        return window.FixChosen;
+    }
+
+    public void ShowMessage(string title, string message, bool isWarning)
+    {
+        if (isWarning) Services.AppLog.Write($"WARNING {title}: {message}");
+        ModernMessageBox.Show(this, message, title, MessageBoxButton.OK, isWarning ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    }
 
     public bool Confirm(string title, string message) =>
-        MessageBox.Show(this, message, title, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) == MessageBoxResult.OK;
+        ModernMessageBox.Show(this, message, title, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) == MessageBoxResult.OK;
 
     public (bool Removed, Jarvis.Core.Vault.NumberingScheme? Scheme)? AskNumbering(Jarvis.Core.Vault.NumberingScheme? current)
     {
@@ -148,6 +319,17 @@ public partial class MainWindow : Window, IDialogs
     {
         var dialog = new TextPromptWindow(title, prompt, initial, problem) { Owner = this };
         return dialog.ShowDialog() == true ? dialog.Value : null;
+    }
+
+    public string? AskSaveFile(string title, string defaultName, string filter)
+    {
+        // Not in the vault folder: a file saved there would show up as a new file to check in.
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = title, FileName = defaultName, Filter = filter,
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        };
+        return dialog.ShowDialog(this) == true ? dialog.FileName : null;
     }
 
     public string? AskFolderOnDisk(string title)

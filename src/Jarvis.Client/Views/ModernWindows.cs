@@ -13,6 +13,7 @@ namespace Jarvis.Client.Views;
 /// </summary>
 internal static class ModernWindows
 {
+    private const int DarkModeAttribute = 20;     // DWMWA_USE_IMMERSIVE_DARK_MODE (the title bar's buttons)
     private const int CaptionColorAttribute = 35; // DWMWA_CAPTION_COLOR (Windows 11)
     private const int TextColorAttribute = 36;    // DWMWA_TEXT_COLOR
 
@@ -28,12 +29,21 @@ internal static class ModernWindows
     private static void OnLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is Window hooked) WheelScrolling.Attach(hooked);
-        if (sender is not Window window || window.Background is not SolidColorBrush background) return;
+        if (sender is Window window) StyleTitleBar(window);
+    }
+
+    /// <summary>Colors the window's title bar like the window itself (again whenever the look switches between light and dark).</summary>
+    public static void StyleTitleBar(Window window)
+    {
+        if (window.Background is not SolidColorBrush background) return;
         try
         {
             var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            var dark = ThemeManager.IsDark ? 1 : 0;
             var caption = ToColorRef(background.Color);
-            var text = ToColorRef(Color.FromRgb(0x1F, 0x29, 0x37));
+            var text = ToColorRef(window.TryFindResource("TextBrush") is SolidColorBrush textBrush ? textBrush.Color : Color.FromRgb(0x1F, 0x29, 0x37));
+            DwmSetWindowAttribute(hwnd, DarkModeAttribute, ref dark, sizeof(int));
             DwmSetWindowAttribute(hwnd, CaptionColorAttribute, ref caption, sizeof(int));
             DwmSetWindowAttribute(hwnd, TextColorAttribute, ref text, sizeof(int));
         }

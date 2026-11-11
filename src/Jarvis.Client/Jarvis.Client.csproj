@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <Resource Include="..\..\assets\vault.ico" Link="Assets\vault.ico" />
+    <!-- The add-in installer runs as administrator: the exe carries its own copy instead of trusting one in the Temp folder. -->
+    <EmbeddedResource Include="..\..\scripts\Install-SolidWorksAddin.ps1" LogicalName="Jarvis.Client.InstallAddin.ps1" />
   </ItemGroup>
 
   <ItemGroup>

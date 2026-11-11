@@ -32,7 +32,7 @@ internal sealed class NumberingWindow : Window
     private readonly StackPanel _groupSection = new StackPanel();
     private readonly WrapPanel _cotsSection = new WrapPanel { Margin = new Thickness(22, 6, 0, 0) };
     private readonly TextBlock _example = new TextBlock { Margin = new Thickness(0, 10, 0, 0), FontWeight = FontWeights.SemiBold };
-    private readonly TextBlock _problem = new TextBlock { Foreground = System.Windows.Media.Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
+    private readonly TextBlock _problem = new TextBlock { Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("DangerBrush"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
 
     public NumberingWindow(NumberingScheme? current)
     {
@@ -119,7 +119,7 @@ internal sealed class NumberingWindow : Window
             Text = "When someone checks in a new part from SolidWorks, Jarvis asks which group it belongs to, gives it the next free number " +
                    "(written into its PartNumber property) and offers to rename the file to match. Everyone in the vault gets this setting.",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = System.Windows.Media.Brushes.DimGray,
+            Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush"),
         });
         panel.Children.Add(settings);
         panel.Children.Add(_nameIsNumber);

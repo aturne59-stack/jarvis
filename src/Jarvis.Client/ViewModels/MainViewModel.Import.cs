@@ -62,11 +62,25 @@ public sealed partial class MainViewModel
                     path => SameFileInVault(vault, path, vaultFiles));
                 if (plan == null) return "Import cancelled.";
 
+                // Vault files this import updates with someone's newer copy: checked out to you first, like any edit.
+                var updates = plan.Where(p => p.Item.ReplaceExisting).Select(p => p.Item.Target).ToList();
+                await vault.CheckOutForImportAsync(updates, progress);
+
                 // Copying and repointing read the paths saved in the files: a Pack and Go names the PC it came from.
                 solidWorks.StoredPaths = true;
-                var copies = await Task.Run(() => VaultImport.CopyAndRepoint(vault.VaultRoot, plan.Select(p => p.Item).ToList(), sw, progress));
+                IReadOnlyList<string> copies;
+                try
+                {
+                    copies = await Task.Run(() => VaultImport.CopyAndRepoint(vault.VaultRoot, plan.Select(p => p.Item).ToList(), sw, progress));
+                }
+                catch
+                {
+                    // The vault's files are back as they were: release them again.
+                    if (updates.Count > 0) await vault.UndoCheckOutAsync(updates, progress);
+                    throw;
+                }
                 solidWorks.StoredPaths = false;
-                foreach (var (item, partNumber, description) in plan.Where(p => !p.Item.UseExisting && VaultService.IsSolidWorksFile(p.Item.Target)))
+                foreach (var (item, partNumber, description) in plan.Where(p => !p.Item.UseExisting && !p.Item.ReplaceExisting && VaultService.IsSolidWorksFile(p.Item.Target)))
                 {
                     var properties = new Dictionary<string, string>();
                     if (partNumber != null) properties[IndexEntry.PartNumberProperty] = partNumber;
@@ -82,7 +96,7 @@ public sealed partial class MainViewModel
                 progress.Report("Making the vault records…");
                 var batch = await Task.Run(() => sw.Record(vault.VaultRoot, copies));
                 var index = batch?.Entries.ToDictionary(e => vault.ToFullPath(e.Key), e => (IndexEntry?)e.Value, StringComparer.OrdinalIgnoreCase);
-                var result = await vault.CheckInAsync(copies, $"Imported {copies.Count} file(s) from {Path.GetFileName(source)}", progress: progress, indexUpdates: index);
+                var result = await vault.CheckInAsync(copies, VaultImport.CheckInComment(copies.Count - updates.Count, updates.Count, Path.GetFileName(source)), progress: progress, indexUpdates: index);
                 return Report(result, "Imported");
             }
             finally

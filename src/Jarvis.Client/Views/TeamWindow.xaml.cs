@@ -24,9 +24,9 @@ public partial class TeamWindow : Window
         public TeamMember Member { get; init; } = null!;
         public string Title { get; init; } = "";
         public string Detail { get; init; } = "";
-        public Brush DetailBrush { get; init; } = Brushes.Gray;
+        public Brush DetailBrush { get; init; } = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush");
         public string Initials { get; init; } = "";
-        public Brush AvatarBrush { get; init; } = Brushes.Gray;
+        public Brush AvatarBrush { get; init; } = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush");
         public string ActionText { get; init; } = "";
         public Visibility ActionVisibility { get; init; }
     }
@@ -167,7 +167,7 @@ public partial class TeamWindow : Window
             ? $"Cancel {name}'s invitation to {_vaultName}?"
             : $"Remove {name} from {_vaultName}?\n\nThey keep the files already on their PC, but can't Get Latest or check in anymore. " +
               "Anything they have checked out stays checked out until an admin uses Break Lock.";
-        if (MessageBox.Show(this, question, "Team", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
+        if (ModernMessageBox.Show(this, question, "Team", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
 
         var parts = _repo.FullName.Split('/');
         SetBusy(true, member.IsPending ? "Cancelling the invitation\u2026" : $"Removing {name}\u2026", Muted);

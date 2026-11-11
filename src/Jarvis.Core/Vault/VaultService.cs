@@ -434,30 +434,81 @@ public sealed partial class VaultService : IVaultService
             throw new FileInUseException(inUse, "The vault has a newer version. Close them in SolidWorks so they can be updated, then try again.");
         }
 
+        // The long part, downloading the new versions, happens here, before any file in the vault folder is touched.
+        // That makes it safe to cancel: nothing has changed yet, and what was downloaded is kept for next time.
+        progress?.Report($"Downloading {incoming.Count} updated file(s) from the vault\u2026");
+        await PreDownloadAsync(incoming.Count, progress, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+
+        // From here on the files are replaced, which is quick (they're already on this PC) and is never interrupted.
+        var noCancel = CancellationToken.None;
+
         // Files this PC uses an older version of: back to the latest for the update, pinned again after.
         var pinnedIncoming = pins.Pins.Where(p => incoming.Contains(p.Path)).ToList();
-        foreach (var pin in pinnedIncoming) await RestoreWorkingFileAsync(pin.Path, "HEAD", ct).ConfigureAwait(false);
+        foreach (var pin in pinnedIncoming) await RestoreWorkingFileAsync(pin.Path, "HEAD", noCancel).ConfigureAwait(false);
 
-        progress?.Report($"Getting {incoming.Count} updated file(s) from the vault\u2026");
-        var merge = await RunAsync(new[] { "merge", "--ff", "--no-edit", "--no-stat", "-m", "Merge vault changes", Upstream }, ct, TransferTimeout).ConfigureAwait(false);
+        progress?.Report($"Updating {incoming.Count} file(s)\u2026");
+        var merge = await RunAsync(new[] { "merge", "--ff", "--no-edit", "--no-stat", "-m", "Merge vault changes", Upstream }, noCancel, TransferTimeout).ConfigureAwait(false);
         if (!merge.Success)
         {
             if (File.Exists(Path.Combine(VaultRoot, ".git", "MERGE_HEAD")))
             {
-                await RunAsync(new[] { "merge", "--abort" }, ct).ConfigureAwait(false);
+                await RunAsync(new[] { "merge", "--abort" }, noCancel).ConfigureAwait(false);
             }
-            foreach (var pin in pinnedIncoming) await RestoreWorkingFileAsync(pin.Path, pin.Commit, ct).ConfigureAwait(false);
+            foreach (var pin in pinnedIncoming) await RestoreWorkingFileAsync(pin.Path, pin.Commit, noCancel).ConfigureAwait(false);
             throw GitErrorClassifier.Classify(merge, "get the latest versions");
         }
         foreach (var pin in pinnedIncoming)
         {
             // A file deleted from the vault can't stay pinned.
-            if (File.Exists(ToFullPath(pin.Path))) await RestoreWorkingFileAsync(pin.Path, pin.Commit, ct).ConfigureAwait(false);
+            if (File.Exists(ToFullPath(pin.Path))) await RestoreWorkingFileAsync(pin.Path, pin.Commit, noCancel).ConfigureAwait(false);
             else pins.Remove(pin.Path);
         }
         pins.Save(VaultRoot);
 
         return new GetLatestResult(behind, incoming.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex LfsProgress =
+        new System.Text.RegularExpressions.Regex(@"(?<percent>\d+)% \((?<done>\d+)/(?<total>\d+)\)(?:, (?<size>[\d.]+ \w+))?", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>"Downloading LFS objects: 45% (5/11), 12 MB | 3 MB/s" as "Downloading file 5 of 11 (45%, 12 MB)"; null for any other line.</summary>
+    internal static string? DescribeLfsProgress(string line)
+    {
+        var match = LfsProgress.Match(line);
+        if (!match.Success) return null;
+        var size = match.Groups["size"].Success ? ", " + match.Groups["size"].Value : "";
+        return $"Downloading file {match.Groups["done"].Value} of {match.Groups["total"].Value} ({match.Groups["percent"].Value}%{size})\u2026";
+    }
+
+    /// <summary>
+    /// Downloads the file contents the vault's newest state needs into Git's own store, without touching the
+    /// vault folder. If it can't (no Git LFS here, or the server hiccups), the update that follows downloads
+    /// them itself and reports what went wrong, as it always did.
+    /// </summary>
+    private async Task PreDownloadAsync(int files, IProgress<string>? progress, CancellationToken ct)
+    {
+        var args = new[] { "lfs", "fetch", Config.Remote, "refs/remotes/" + Upstream };
+        if (_git is GitRunner runner)
+        {
+            var lines = progress == null ? null : new InlineProgress(line =>
+            {
+                if (DescribeLfsProgress(line) is { } text) progress.Report(text);
+            });
+            await runner.RunAsync(args, null, TransferTimeout, ct, lines).ConfigureAwait(false);
+        }
+        else
+        {
+            await RunAsync(args, ct, TransferTimeout).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Reports on the thread that produced the value (Git's reader), so progress isn't queued behind a busy UI thread and reordered.</summary>
+    private sealed class InlineProgress : IProgress<string>
+    {
+        private readonly Action<string> _report;
+        public InlineProgress(Action<string> report) => _report = report;
+        public void Report(string value) => _report(value);
     }
 
     // ---------------------------------------------------------------- Check Out

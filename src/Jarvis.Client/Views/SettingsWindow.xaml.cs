@@ -26,6 +26,8 @@ public partial class SettingsWindow : Window
         NoFoldersText.Visibility = FolderList.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DownloadSomeRadio.IsChecked = downloadFolders != null;
         DownloadAllRadio.IsChecked = downloadFolders == null;
+        var theme = ThemeManager.Normalize(Jarvis.Core.Config.UserSettings.Load().Theme);
+        ThemeBox.SelectedItem = ThemeBox.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == theme);
         ShowAddin();
     }
 
@@ -54,7 +56,7 @@ public partial class SettingsWindow : Window
         catch (PdmException ex)
         {
             ShowAddin();
-            MessageBox.Show(this, ex.Message, "SolidWorks add-in", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ModernMessageBox.Show(this, ex.Message, "SolidWorks add-in", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -87,10 +89,19 @@ public partial class SettingsWindow : Window
     {
         if (!Directory.Exists(Path.Combine(VaultPath, ".git")))
         {
-            var answer = MessageBox.Show(this,
+            var answer = ModernMessageBox.Show(this,
                 $"{VaultPath} doesn't look like a vault (no .git folder). Save anyway?",
                 "Settings", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (answer != MessageBoxResult.Yes) return;
+        }
+        // The look is this PC's own setting: saved and switched right away.
+        var settings = Jarvis.Core.Config.UserSettings.Load();
+        var theme = (string)((ComboBoxItem)ThemeBox.SelectedItem).Tag;
+        if (ThemeManager.Normalize(settings.Theme) != theme)
+        {
+            settings.Theme = theme;
+            settings.Save();
+            ThemeManager.Apply(theme);
         }
         DialogResult = true;
     }

@@ -7,9 +7,19 @@ public partial class ErrorWindow : Window
 {
     private readonly PdmException _error;
 
-    public ErrorWindow(PdmException error)
+    /// <summary>True when the user clicked the offered fix instead of OK.</summary>
+    public bool FixChosen { get; private set; }
+
+    /// <param name="fixText">A one-click way out of this error (e.g. "Keep copies, get the vault's"), shown as the blue button.</param>
+    public ErrorWindow(PdmException error, string? fixText = null, string? fixToolTip = null)
     {
         InitializeComponent();
+        if (fixText != null)
+        {
+            FixButton.Content = fixText;
+            FixButton.ToolTip = fixToolTip;
+            FixButton.Visibility = Visibility.Visible;
+        }
         _error = error;
         Title = "Jarvis — " + error.Title;
         TitleText.Text = error.Title;
@@ -25,4 +35,10 @@ public partial class ErrorWindow : Window
         Clipboard.SetText($"{_error.Title}\n{_error.Message}\n\n{_error.Detail}".TrimEnd());
 
     private void OnOk(object sender, RoutedEventArgs e) => Close();
+
+    private void OnFix(object sender, RoutedEventArgs e)
+    {
+        FixChosen = true;
+        Close();
+    }
 }

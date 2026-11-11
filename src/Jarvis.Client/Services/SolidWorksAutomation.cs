@@ -190,6 +190,79 @@ internal sealed class SolidWorksAutomation : IReferenceEditor, IDisposable
         }
     }
 
+    private static object? Invoke(object target, string method, params object[] args) =>
+        target.GetType().InvokeMember(method, BindingFlags.InvokeMethod, null, target, args);
+
+    private static object? Get(object target, string property) =>
+        target.GetType().InvokeMember(property, BindingFlags.GetProperty, null, target, null);
+
+    /// <summary>
+    /// Flattened, parts-only bill of materials of an assembly, the same list the SolidWorks pane's Export BOM makes:
+    /// every part at any level, counted per configuration, without suppressed, envelope and excluded-from-BOM
+    /// components (and everything inside them). Opens the assembly hidden and read-only unless it's already open.
+    /// Properties are left empty: the caller fills them from the vault's records.
+    /// </summary>
+    public List<BomLine> GetBom(string assemblyPath)
+    {
+        object? doc = null;
+        try
+        {
+            doc = Call("GetOpenDocumentByName", assemblyPath);
+        }
+        catch (Exception ex) when (ex is COMException or TargetInvocationException)
+        {
+            // Not open.
+        }
+        var openedHere = false;
+        if (doc == null)
+        {
+            const int assembly = 2;
+            // Silent, read-only and lightweight: only the structure is needed, not every part's geometry.
+            var openArgs = new object?[] { assemblyPath, assembly, 1 | 2 | 64 | 128, "", 0, 0 };
+            Call("DocumentVisible", false, assembly);
+            try
+            {
+                doc = _sw!.GetType().InvokeMember("OpenDoc6", BindingFlags.InvokeMethod, null, _sw, openArgs, new[] { new ParameterModifier(6) { [4] = true, [5] = true } }, null, null);
+            }
+            finally
+            {
+                Call("DocumentVisible", true, assembly);
+            }
+            if (doc == null) throw new PdmException($"SolidWorks couldn't open {Path.GetFileName(assemblyPath)} (error {openArgs[4]}).");
+            openedHere = true;
+        }
+        try
+        {
+            var lines = new Dictionary<string, BomLine>(StringComparer.OrdinalIgnoreCase);
+            if (Invoke(doc, "GetComponents", false) is not Array components) return new List<BomLine>();
+            foreach (var component in components)
+            {
+                if (component == null || Excluded(component)) continue;
+                var path = Invoke(component, "GetPathName") as string ?? "";
+                if (!Path.GetExtension(path).Equals(".sldprt", StringComparison.OrdinalIgnoreCase)) continue;
+                var configuration = Get(component, "ReferencedConfiguration") as string ?? "";
+                var key = path + "|" + configuration;
+                if (!lines.TryGetValue(key, out var line)) lines[key] = line = new BomLine { Path = path, Configuration = configuration };
+                line.Quantity++;
+            }
+            return lines.Values.ToList();
+        }
+        finally
+        {
+            if (openedHere) Call("CloseDoc", assemblyPath);
+        }
+    }
+
+    /// <summary>Suppressed, an envelope or excluded from the BOM, itself or through any assembly it sits in.</summary>
+    private static bool Excluded(object component)
+    {
+        for (var c = component; c != null; c = Invoke(c, "GetParent"))
+        {
+            if (Invoke(c, "IsSuppressed") is true || Get(c, "ExcludeFromBOM") is true || Invoke(c, "IsEnvelope") is true) return true;
+        }
+        return false;
+    }
+
     private bool IsOpenInSolidWorks(string fullPath)
     {
         try

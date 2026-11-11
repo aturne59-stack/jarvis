@@ -35,6 +35,12 @@ Go to the **[latest release](https://github.com/aturne59-stack/jarvis/releases/l
 * **Edit Description**: right-click a SolidWorks file and choose **Edit Description…**. The description is the Description property inside the file (BOMs and drawings read it there), so Jarvis checks the file out, has SolidWorks write it in the background, and checks it in; teammates see it at their next refresh. If the file is already checked out to you, it's saved in the file and goes in with your next check-in. Close the file in SolidWorks first.
 * **Export** (like Pack and Go): select files, right-click, **Export…**. Jarvis copies them and every part and sub-assembly they use (all levels), and their drawings if you want, to a folder or a .zip file, and points the copies' assemblies and drawings at each other, so they open on any PC without the vault (to send to a sponsor, a machine shop or a teammate). Files that are only placeholders on your PC are downloaded first. SolidWorks is used in the background, as for Move to Folder. Nothing in the vault changes, and the copies aren't linked to it.
 * The version you're on is shown at the bottom right of Jarvis and at the bottom of the SolidWorks pane. The add-in updates along with the app: if its update was skipped (SolidWorks was open), Jarvis offers it again at the next start.
+* **Export BOM (Excel)**: right-click an assembly, **Export**, **Export BOM (Excel)…**: the same parts list the SolidWorks pane makes (every part at every level with quantity, description, material and revision). SolidWorks reads the assembly in the background.
+* **Filters and the summary:** the chips above the list ("Checked out to me 3", "Needs attention 1") show only those files; a chip appears when it has files. With no file selected, the panel on the right shows what's checked out to you, **what teammates checked in** (a blue dot marks the ones new since you clicked **Mark as seen**) and how much **storage** the vault uses.
+* **Columns:** right-click a column header to choose the columns, switch to compact rows, or put them back.
+* **Light or dark:** **Settings**, **Look**. "Same as Windows" follows Windows' setting.
+* **Shortcuts:** Ctrl+G Get Latest, Ctrl+O Check Out, Ctrl+I Check In, Ctrl+U Undo Check Out, Ctrl+H History, Ctrl+E Explorer, Enter Open, F2 Rename, Ctrl+F Search, F5 Refresh, F1 Help.
+* **Cancel:** while Get Latest downloads, **Cancel** (bottom left) stops it. Nothing in the vault folder has changed at that point, and what was downloaded is kept for next time.
 * **New files** (state "New, not in vault yet") just need a Check In. There's no need to check them out first.
 * **Details panel** (right side of the app): a **3D preview you can rotate** (drag to rotate, right-drag to pan, scroll to zoom; **Open large 3D view** for a bigger window) or a picture, its properties (part number, description, material, ...), what it **contains**, and **where it's used**. Check where-used before changing a part, so you know which assemblies it affects.
 * **Search** finds files by name, part number, description or any other SolidWorks property.
@@ -76,7 +82,7 @@ In SolidWorks, click the **safe icon** tab in the Task Pane on the right. It sho
 * **Open a part from an assembly:** right-click a part or sub-assembly under Files in use and choose **Open**.
 * **Use an older version (this PC only):** right-click a row under Files in use and choose **Use an older version…**, then pick a version. Your PC loads that version (read-only) and reopens the assembly with it, while the rest of the assembly stays at the latest; the vault and your teammates are not affected. The row shows the version in purple (e.g. `3/5`). Get Latest keeps your choice. Right-click again and choose **Return to the latest version** to switch back (the app's right-click menu has **Return to Latest Version** too). A file on an older version can't be checked out or in until it's back on the latest. To make an old version the newest one for everyone, use **History → Restore This Version** in the app.
 * **Rename / Move**: the safe way to rename or move a file. It finds every assembly and drawing that uses the file, updates their references, and checks everything in together.
-* **Import files…** (also **Import** in the Jarvis app's toolbar, which uses SolidWorks in the background; records come from the add-in if SolidWorks is open, and 3D previews only from the SolidWorks pane): brings existing SolidWorks files into the vault, e.g. a new member's project. Pick their folder; Jarvis lists every part, assembly and drawing in it (plus files they use from other folders). In the table, pick each file's group (if the vault has part numbering) and edit its name and description; the new file names are shown. Choose the vault folder (Sandbox by default) and click **Import and Check In**: the files are copied in under the new names, every assembly and drawing is pointed at the copies, part numbers and descriptions are saved, and it's all checked in as one change with 3D previews. The original files aren't changed. Close the originals in SolidWorks first.
+* **Import files…** (also **Import** in the Jarvis app's toolbar, which uses SolidWorks in the background; records come from the add-in if SolidWorks is open, and 3D previews only from the SolidWorks pane): brings existing SolidWorks files into the vault, e.g. a new member's project. Pick their folder; Jarvis lists every part, assembly and drawing in it (plus files they use from other folders). In the table, pick each file's group (if the vault has part numbering) and edit its name and description; the new file names are shown. Choose the vault folder (Sandbox by default) and click **Import and Check In**: the files are copied in under the new names, every assembly and drawing is pointed at the copies, part numbers and descriptions are saved, and it's all checked in as one change with 3D previews. The original files aren't changed. Close the originals in SolidWorks first. **A file the vault already has** (same file name) gets a choice in the **Already in the vault** column: use the vault's file (nothing is copied), **update the vault's file with this one** (it's checked out to you and this copy becomes its new version; the old one stays in History), or import it as a separate file under another name. That's how a teammate's changed Pack and Go gets back into the vault.
 * **Submit for review**, and for admins **Approve & release** / **Reject**: see *Review before release* below. Approving a drawing here also saves its PDF.
 * **Export BOM (Excel)**: for an assembly, saves a parts list as a CSV file that opens in Excel: every part at every level with its quantity, part number, description, material and released revision. Suppressed and "excluded from BOM" parts are left out.
 * **Notify me when it's free**: for a file someone else has checked out.
@@ -121,7 +127,7 @@ Click **Help** (in the app's toolbar or the SolidWorks pane) for the common prob
 | **Check-in not sent to the vault** | Your new version is saved on your PC but didn't reach GitHub (offline, or the vault refused it). Your files stay checked out to you. Fix the cause and click **Check In** again: it sends what's waiting. A yellow banner reminds you until it's sent. |
 | **File in use** | Get Latest or Undo needs to replace a file that's open in SolidWorks. Close it (the add-in offers to close and reopen it) and retry. Check-in works with files open. |
 | **Not checked out** | You edited a file without checking it out. Check it out (your edits are kept), then check in. |
-| **Conflict** | The vault has a newer version of a file you also changed. Usually someone broke your check-out. Nothing was overwritten. Copy your version somewhere safe, Undo Check Out, Get Latest, then sort it out with whoever made the other change. |
+| **Conflict** | The vault has a newer version of a file you also changed. Usually someone broke your check-out. Nothing was overwritten. Click **Keep copies, get the vault's** in the message: your versions go to the Backups folder, the vault's take their place and Get Latest finishes. Then sort it out with whoever made the other change. |
 | **Sign-in or permission problem** | Git Credential Manager will ask you to sign in again. If it still fails, ask an admin to check you're a collaborator on the repo. |
 
 ---
@@ -190,7 +196,10 @@ The guard is also why the app warns admins if `.github` is changed: it's the one
 * **Forced unlocks.** GitHub lets anyone with Write access force-unlock a file with raw Git (`git lfs unlock --force`). The app only shows Break Lock to admins, but it can't stop the raw command. What it can do: the vault guard undoes a push that changes a file someone else had checked out, and every version stays in the history. If a lock disappears unexpectedly, look at the repo's **Actions** tab and Discord.
 * **Keep the Discord webhook URL private.** Anyone with it can post messages as the bot. It's stored in `pdm.json`, so everyone with vault access can read it; don't paste it anywhere public. If it leaks, delete the webhook in Discord, make a new one and update `pdm.json`.
 * **The SolidWorks add-in folder** (`C:\ProgramData\Jarvis\SolidWorksAddin`) can only be changed by Windows administrators, so another account on the PC can't swap in a DLL that SolidWorks would load.
-* **Updates are checked** against the SHA-256 checksums published with each release before they're installed.
+* **Updates are checked** against the SHA-256 checksums published with each release before they're installed. Turn on **two-factor sign-in** for the GitHub account that publishes releases: whoever controls it can publish an update. (Releases can also be signed with a key kept off GitHub; see *Automatic updates*.)
+* **Force pushes.** The vault guard puts the vault back if anyone but an admin rewrites its history.
+* **Open** only opens data files (CAD, PDFs, pictures, documents). It refuses programs, scripts and shortcuts someone checked in, and asks first for file types it doesn't know.
+* **The one thing the guard can't stop** is a push that removes or changes the guard's own workflow file: GitHub runs the workflow from the pushed commit. Jarvis notices (banner for admins, Discord alert) and **Update Vault Setup** puts it back, but that push isn't undone. Branch protection (step 3) is the real fix.
 
 ### Breaking a stale lock
 
@@ -281,7 +290,7 @@ If the club should get app updates from a different code repo (for example your 
 
 ### GitHub LFS storage
 
-GitHub limits free LFS **storage and bandwidth**, and every Get Latest that downloads CAD files counts toward bandwidth. **Check the current limits** in GitHub's docs before relying on the free tier. Watch usage under the repo's *Settings → Billing / Git LFS*. If you outgrow it, a paid data pack, GitLab, or a self-hosted Gitea are drop-in replacements: change the repo URL and nothing else.
+GitHub limits free LFS **storage and bandwidth**, and every Get Latest that downloads CAD files counts toward bandwidth. **Check the current limits** in GitHub's docs before relying on the free tier. Jarvis shows how much this vault uses (the summary panel, with no file selected) and warns in the banner at 80% of the allowance; set the allowance with `"storageLimitGb"` in `pdm.json` (10 if it isn't there). The figure counts every stored version of this vault's files; GitHub's allowance is per account, across all its repos. You can also watch usage under the repo's *Settings → Billing / Git LFS*. If you outgrow it, a paid data pack, GitLab, or a self-hosted Gitea are drop-in replacements: change the repo URL and nothing else.
 
 ---
 
@@ -314,6 +323,8 @@ dotnet test Jarvis.sln
 dotnet run --project src/Jarvis.Client
 ```
 
+Every push and pull request is built and tested on GitHub too (`.github/workflows/ci.yml`: the app and the Core tests; not the add-in, which needs SolidWorks). The app logs what it did and every error it showed to `%LocalAppData%\Jarvis\app.log` (the add-in: `addin.log`). Set `JARVIS_THEME` to `Light` or `Dark` to try a look without changing the setting.
+
 The integration tests use a local bare repo in place of GitHub. A local remote has no LFS lock server, so locking itself is only covered by parser and classifier tests. **Test check-out and check-in against a real GitHub test repo before the team relies on it.**
 
 ### Publishing the app
@@ -328,7 +339,9 @@ This produces the release files: a self-contained single-file `Jarvis.exe` (team
 
 ### Automatic updates
 
-The app checks this repo's **GitHub Releases** each time it starts. When there's a newer version it asks, downloads it (and the SolidWorks add-in, if installed; Windows asks for permission for that part), **checks every file against the release's `SHA256SUMS`**, swaps the exe and restarts. To publish a version:
+The app checks this repo's **GitHub Releases** each time it starts, and every few hours while it's open (then an **Update** button appears in the toolbar). When there's a newer version it asks, downloads it (and the SolidWorks add-in, if installed; Windows asks for permission for that part), **checks every file against the release's `SHA256SUMS`**, swaps the exe and restarts.
+
+**Signed releases (optional, off).** `scripts\New-ReleaseKey.ps1` makes a key: the private half goes to `%UserProfile%\.jarvis\release-key.xml` (never in the repo), the public half into `<UpdateKey>` in `Directory.Build.props`, which is baked into the build. Builds with a key only install updates whose `SHA256SUMS` is signed with it (`SHA256SUMS.sig`, made by `Release-Client.ps1`), so even someone who took over the GitHub account couldn't publish one. The catch: lose the private key and installed copies refuse every later update, so everyone has to download a new `Jarvis.exe` by hand. `<UpdateKey>` is empty for now (checksums only). To publish a version:
 
 1. Raise `<Version>` in `Directory.Build.props`, commit and push.
 2. Run `.\scripts\Release-Client.ps1 -Notes "What changed"`. It builds everything and creates release `v<Version>` with the files attached, using your saved GitHub sign-in.

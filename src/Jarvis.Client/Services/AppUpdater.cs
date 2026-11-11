@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
+using Jarvis.Client.Views;
 using Jarvis.Core.Errors;
 using Jarvis.Core.Install;
 using Jarvis.Core.Updates;
@@ -36,9 +37,8 @@ public static class AppUpdater
     private static Updater? ForThisCopy()
     {
         var exe = Environment.ProcessPath;
-        var repo = Updater.BuiltInRepo(Assembly.GetExecutingAssembly());
-        if (exe == null || repo == null || AppInstaller.IsDevelopmentBuild(exe) || !AppInstaller.IsInstalled(exe, InstallLayout.ForThisUser())) return null;
-        return new Updater(repo);
+        if (exe == null || AppInstaller.IsDevelopmentBuild(exe) || !AppInstaller.IsInstalled(exe, InstallLayout.ForThisUser())) return null;
+        return Updater.ForBuild(Assembly.GetExecutingAssembly());
     }
 
     private static Version Current => Updater.CurrentVersion(Assembly.GetExecutingAssembly());
@@ -90,7 +90,7 @@ public static class AppUpdater
     public static bool AskToUpdate(Window owner, ReleaseInfo release)
     {
         var notes = Updater.WhatsNew(release.Notes);
-        return MessageBox.Show(owner,
+        return ModernMessageBox.Show(owner,
             $"Jarvis {release.Version.ToString(3)} is available (you have {Current.ToString(3)}).\n\n" +
             (notes.Length > 0 ? notes + "\n\n" : "") + "Update now? It takes about a minute and the app restarts.",
             "Update available", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes;
@@ -115,12 +115,12 @@ public static class AppUpdater
         }
         catch (PdmException ex)
         {
-            MessageBox.Show(owner, ex.Message, "Update failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ModernMessageBox.Show(owner, ex.Message, "Update failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            MessageBox.Show(owner, "The update couldn't be installed: " + ex.Message + "\n\nJarvis keeps working on the current version.",
+            ModernMessageBox.Show(owner, "The update couldn't be installed: " + ex.Message + "\n\nJarvis keeps working on the current version.",
                 "Update failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             if (!File.Exists(exe) && File.Exists(exe + ".old")) File.Move(exe + ".old", exe);
             return;
@@ -142,7 +142,7 @@ public static class AppUpdater
     {
         var installed = SolidWorksAddinSetup.InstalledVersion;
         if (installed == null || installed >= current || installed >= release.Version || release.Find(Updater.AddinAsset) == null) return;
-        var answer = MessageBox.Show(owner,
+        var answer = ModernMessageBox.Show(owner,
             $"The SolidWorks add-in is version {installed.ToString(3)}, but Jarvis is {current.ToString(3)}. Update the add-in now so they match?\n\n" +
             "Windows asks for permission once. SolidWorks has to be closed.",
             "Update the SolidWorks add-in", MessageBoxButton.YesNo, MessageBoxImage.Information);
@@ -154,7 +154,7 @@ public static class AppUpdater
         }
         catch (Exception ex) when (ex is PdmException or IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            MessageBox.Show(owner, "The add-in wasn't updated: " + ex.Message + "\n\nJarvis offers it again next time it starts.",
+            ModernMessageBox.Show(owner, "The add-in wasn't updated: " + ex.Message + "\n\nJarvis offers it again next time it starts.",
                 "Update the SolidWorks add-in", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -174,7 +174,7 @@ public static class AppUpdater
             if (SolidWorksAddinSetup.OnlyHiddenSolidWorksRunning)
             {
                 // A SolidWorks with no window (left by a crash or another program): the user can't close it themselves.
-                var end = MessageBox.Show(owner,
+                var end = ModernMessageBox.Show(owner,
                     "SolidWorks is still running in the background, without a window (left over from a crash or started by another program), " +
                     "so the add-in can't be updated.\n\nEnd it now? Nothing you can see is open in it.",
                     "Update the SolidWorks add-in", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -183,12 +183,12 @@ public static class AppUpdater
                 await Task.Delay(2000);
                 continue;
             }
-            var close = MessageBox.Show(owner,
+            var close = ModernMessageBox.Show(owner,
                 "The SolidWorks add-in will be updated too. Close SolidWorks (save your work first), then click OK.\n\nCancel skips the add-in for now (Jarvis offers it again next time it starts).",
                 "Update the SolidWorks add-in", MessageBoxButton.OKCancel, MessageBoxImage.Information);
             if (close != MessageBoxResult.OK) return;
         }
 
-        await SolidWorksAddinSetup.InstallAsync(updater, release, folder, showConsole: true);
+        await SolidWorksAddinSetup.InstallAsync(updater, release, folder);
     }
 }

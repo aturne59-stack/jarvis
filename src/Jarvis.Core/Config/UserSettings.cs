@@ -17,6 +17,15 @@ public sealed class UserSettings
     /// <summary>Every vault folder on this PC (one per group). The add-in uses whichever one holds the open file.</summary>
     public List<string> Vaults { get; set; } = new List<string>();
 
+    /// <summary>The desktop app's look: "System" (follow Windows), "Light" or "Dark".</summary>
+    public string Theme { get; set; } = "System";
+
+    /// <summary>Columns of the app's file list the user turned off (by header). Null: the app's own choice.</summary>
+    public List<string>? HiddenColumns { get; set; }
+
+    /// <summary>Shorter rows in the app's file list, to see more files at once.</summary>
+    public bool CompactRows { get; set; }
+
     public static string FilePath => Path.Combine(
         AppFolders.Roaming, "settings.json");
 

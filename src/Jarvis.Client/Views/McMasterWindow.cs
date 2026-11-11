@@ -34,7 +34,7 @@ internal sealed class McMasterWindow : Window
         ShowInTaskbar = false;
 
         _partNumber = new TextBox { Margin = new Thickness(0, 6, 0, 0), Padding = new Thickness(6, 4, 6, 4), FontSize = 15 };
-        _status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0), Foreground = System.Windows.Media.Brushes.DimGray };
+        _status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0), Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush") };
         _get = new Button { Content = "Get from McMaster", IsDefault = true, Style = (Style)Application.Current.FindResource("AccentButton"), Padding = new Thickness(14, 4, 14, 4) };
         var cancel = new Button { Content = "Cancel", IsCancel = true, Style = (Style)Application.Current.FindResource("DialogButton") };
         _get.Click += async (_, _) => await GetAsync();
@@ -50,7 +50,7 @@ internal sealed class McMasterWindow : Window
             Text = $"For example 91251A540. Jarvis opens the part on McMaster's site; click Download there and choose SOLIDWORKS. " +
                    $"Jarvis puts the file in {McMaster.Folder.Replace('/', '\\')} in the vault.",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = System.Windows.Media.Brushes.DimGray,
+            Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("MutedTextBrush"),
             Margin = new Thickness(0, 2, 0, 0),
         });
         panel.Children.Add(_partNumber);

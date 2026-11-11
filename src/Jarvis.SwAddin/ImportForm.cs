@@ -19,6 +19,9 @@ internal sealed class ImportForm : Form
     private const string Ours = "Ours (gets the next number)";
     private const string Bought = "COTS (bought; keeps its name)";
     private const string AfterModel = "Named after its model";
+    private const string UseVaults = "Use the vault's file";
+    private const string UpdateVaults = "Update the vault's file with this one";
+    private const string Separate = "Import as a separate file";
 
     private readonly IReadOnlyList<(string Path, bool FromElsewhere)> _files;
     private readonly NumberingScheme? _scheme;
@@ -62,12 +65,18 @@ internal sealed class ImportForm : Form
                    "The original files aren't changed." + (scheme == null ? ""
                        : scheme.NameIsNumber ? $" Our parts and assemblies are named by the next part number ({scheme.Example()}) at the top of the vault, so describe each one; bought parts keep their names and go in {(scheme.CotsFolder.Length > 0 ? scheme.CotsFolder : "the vault")}. A drawing takes the name of the model it's named after."
                        : " Pick each file's group to give it the next part number.") +
-                   (_inVault.Any(m => m != null) ? " Files the vault already has use the vault's file instead of a second copy; untick one to import it under another name." : ""),
+                   (_inVault.Any(m => m != null) ? " For a file the vault already has, choose: use the vault's file (nothing is copied), update the vault's file with this one " +
+                                                   "(it's checked out to you and this becomes its new version), or import it as a separate file under another name." : ""),
         };
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "File", HeaderText = "File", ReadOnly = true, FillWeight = 120 });
         var anyInVault = _inVault.Any(m => m != null);
-        if (anyInVault) _grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "UseVault", HeaderText = "Use the vault's file", FillWeight = 55 });
+        if (anyInVault)
+        {
+            var inVault = new DataGridViewComboBoxColumn { Name = "InVault", HeaderText = "Already in the vault", FillWeight = 100, FlatStyle = FlatStyle.Flat };
+            inVault.Items.AddRange(UseVaults, UpdateVaults, Separate);
+            _grid.Columns.Add(inVault);
+        }
         if (scheme != null)
         {
             var group = new DataGridViewComboBoxColumn { Name = "Group", HeaderText = scheme.NameIsNumber ? "Ours or COTS" : "Group", FillWeight = 80, FlatStyle = FlatStyle.Flat };
@@ -99,16 +108,22 @@ internal sealed class ImportForm : Form
             {
                 if (match == null)
                 {
-                    row.Cells["UseVault"] = new DataGridViewTextBoxCell { Value = "" };
-                    row.Cells["UseVault"].ReadOnly = true;
+                    row.Cells["InVault"] = new DataGridViewTextBoxCell { Value = "" };
+                    row.Cells["InVault"].ReadOnly = true;
                 }
                 else
                 {
-                    // Ticked by default; untick to import it as a separate file under another name (a different part that happens to share the name).
-                    row.Cells["UseVault"].Value = true;
-                    row.Cells["UseVault"].ToolTipText = match.Value.Identical
-                        ? $"Identical to the vault's {match.Value.RelativePath}. Ticked: the imported files use that one. Unticked: it's imported as a separate file under another name."
-                        : $"The vault's {match.Value.RelativePath} has the same name but isn't the same file. Ticked: the imported files use the vault's (this copy's changes aren't imported). Unticked: it's imported under another name.";
+                    // An identical file has nothing to update the vault's with.
+                    var choice = new DataGridViewComboBoxCell { FlatStyle = FlatStyle.Flat };
+                    choice.Items.Add(UseVaults);
+                    if (!match.Value.Identical) choice.Items.Add(UpdateVaults);
+                    choice.Items.Add(Separate);
+                    row.Cells["InVault"] = choice;
+                    choice.Value = UseVaults;
+                    choice.ToolTipText = match.Value.Identical
+                        ? $"Identical to the vault's {match.Value.RelativePath}. Use the vault's file: the imported files use that one. Import as a separate file: it's copied in under another name."
+                        : $"The vault's {match.Value.RelativePath} has the same name but isn't the same file. Use the vault's file: this copy's changes aren't imported. " +
+                          "Update the vault's file: this copy becomes its new version (the old one stays in History). Import as a separate file: for a different part that happens to share the name.";
                 }
             }
             row.Cells["Name"].Value = scheme == null || scheme.NameIsNumber ? Path.GetFileNameWithoutExtension(path) : VaultImport.DescriptiveName(path, scheme);
@@ -198,13 +213,15 @@ internal sealed class ImportForm : Form
             var path = _files[i].Path;
             var name = (row.Cells["Name"].Value as string ?? "").Trim();
             var description = (row.Cells["Description"].Value as string ?? "").Trim();
-            var useVault = _inVault[i] != null && row.Cells["UseVault"].Value is true;
-            foreach (var column in new[] { "Group", "Name", "Description" }.Where(_grid.Columns.Contains)) row.Cells[column].ReadOnly = useVault;
-            if (useVault)
+            var inVaultChoice = _inVault[i] == null ? null : row.Cells["InVault"].Value as string;
+            var useVault = inVaultChoice == UseVaults;
+            var updateVault = inVaultChoice == UpdateVaults;
+            foreach (var column in new[] { "Group", "Name", "Description" }.Where(_grid.Columns.Contains)) row.Cells[column].ReadOnly = useVault || updateVault;
+            if (useVault || updateVault)
             {
                 var vaultPath = _inVault[i]!.Value.RelativePath;
-                row.Cells["NewName"].Value = "Uses the vault's " + vaultPath;
-                results[i] = (new ImportItem(path, vaultPath, useExisting: true), null, "");
+                row.Cells["NewName"].Value = (useVault ? "Uses the vault's " : "Updates the vault's ") + vaultPath;
+                results[i] = (new ImportItem(path, vaultPath, useExisting: useVault, replaceExisting: updateVault), null, "");
                 modelNames[Path.GetFileNameWithoutExtension(path)] = vaultPath.Substring(0, vaultPath.Length - Path.GetExtension(vaultPath).Length);
                 continue;
             }

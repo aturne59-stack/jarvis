@@ -37,7 +37,7 @@ public sealed class HelpTopic
 /// </summary>
 public static class HelpTopics
 {
-    public const string BackupsNote = "Jarvis keeps a copy of every file it replaces or deletes in %LocalAppData%\\Jarvis\\Backups, in a folder named by date and time.";
+    public const string BackupsNote = "Jarvis keeps a copy of every file it replaces or deletes in %LocalAppData%\\Jarvis\\Backups, in a folder named by date and time, for 60 days.";
 
     public static IReadOnlyList<HelpTopic> All { get; } = new[]
     {
@@ -50,6 +50,8 @@ public static class HelpTopics
         new HelpTopic("Conflict: \"These files have a newer version in the vault, but you also changed them on this PC\"",
             "Get Latest stopped because someone else changed files you also changed. Nothing was overwritten.",
             "Close SolidWorks.",
+            "In the Jarvis app, the message has a button: Keep copies, get the vault's. It does the steps below in one go.",
+            "By hand (or from the SolidWorks pane):",
             "Set the filter (top right) to Needs attention. The files in the message show as orange \"Edited WITHOUT check-out!\".",
             "Select all of them: click one, press Ctrl+A, and scroll to the bottom to make sure every one is selected.",
             "Right-click, choose Undo Check Out and confirm. Your versions are kept in the Backups folder.",
@@ -118,6 +120,6 @@ public static class HelpTopics
         new HelpTopic("Asking a teammate for help",
             "Every error window has a Copy button.",
             "Click Copy and paste the text into your team chat.",
-            "For the SolidWorks pane, also send %LocalAppData%\\Jarvis\\addin.log."),
+            "If they need more, send them the log: %LocalAppData%\\Jarvis\\app.log for the app, addin.log (same folder) for the SolidWorks pane."),
     };
 }

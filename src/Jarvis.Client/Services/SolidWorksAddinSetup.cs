@@ -15,6 +15,10 @@ namespace Jarvis.Client.Services;
 /// <summary>
 /// The SolidWorks add-in: is SolidWorks on this PC, is the add-in installed, and installing it from a
 /// release's Jarvis-SolidWorksAddin.zip (checked against SHA256SUMS) with scripts\Install-SolidWorksAddin.ps1.
+///
+/// The installer runs as administrator, so nothing it runs or copies is trusted from the Temp folder: the
+/// script is the copy built into this exe (its hash is checked again in the elevated process before it runs),
+/// and each DLL's hash, taken from the checked zip in memory, is checked again once it's in the install folder.
 /// </summary>
 internal static class SolidWorksAddinSetup
 {
@@ -109,14 +113,13 @@ internal static class SolidWorksAddinSetup
                                    "Open Task Manager (Ctrl+Shift+Esc), right-click SOLIDWORKS, choose End task, then try again.");
         }
         if (IsSolidWorksRunning) throw new PdmException("Close SolidWorks first (save your work), then try again.");
-        var repo = Updater.BuiltInRepo(Assembly.GetExecutingAssembly())
-                   ?? throw new PdmException("This build of Jarvis doesn't know where to download the add-in from. Run scripts\\Install-SolidWorksAddin.ps1 instead.");
-        var updater = new Updater(repo);
+        var updater = Updater.ForBuild(Assembly.GetExecutingAssembly())
+                      ?? throw new PdmException("This build of Jarvis doesn't know where to download the add-in from. Run scripts\\Install-SolidWorksAddin.ps1 instead.");
         var release = await updater.GetLatestAsync()
                       ?? throw new PdmException("Couldn't get the add-in from GitHub. Check your internet connection and try again.");
         try
         {
-            await InstallAsync(updater, release, Path.Combine(Path.GetTempPath(), "Jarvis-addin-" + release.Version), showConsole: false);
+            await InstallAsync(updater, release, Path.Combine(Path.GetTempPath(), "Jarvis-addin-" + release.Version));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
@@ -129,38 +132,86 @@ internal static class SolidWorksAddinSetup
     /// Downloads the add-in from <paramref name="release"/> and installs it (one Windows permission
     /// prompt). SolidWorks must be closed. Throws a <see cref="PdmException"/> that says what went wrong.
     /// </summary>
-    /// <param name="showConsole">Show the installer's console window (the update flow always did).</param>
-    public static async Task InstallAsync(Updater updater, ReleaseInfo release, string folder, bool showConsole)
+    public static async Task InstallAsync(Updater updater, ReleaseInfo release, string folder)
     {
         if (release.Find(Updater.AddinAsset) == null)
         {
             throw new PdmException($"Release {release.Tag} doesn't include the SolidWorks add-in ({Updater.AddinAsset}). Ask whoever maintains Jarvis.");
         }
-        var zip = await updater.DownloadVerifiedAsync(release, Updater.AddinAsset, folder);
+        if (IsSolidWorksRunning) throw new PdmException("Close SolidWorks (save your work first), then try again.");
+
+        // The zip is checked in memory and unpacked from memory, so the hashes below are of the genuine files.
+        var zipBytes = await updater.DownloadVerifiedBytesAsync(release, Updater.AddinAsset);
         var extracted = Path.Combine(folder, "addin");
         if (Directory.Exists(extracted)) Directory.Delete(extracted, recursive: true);
-        ZipFile.ExtractToDirectory(zip, extracted);
-
-        var script = Path.Combine(extracted, "Install-SolidWorksAddin.ps1");
-        if (!File.Exists(script)) throw new PdmException($"{Updater.AddinAsset} is missing its installer.");
-        var start = new ProcessStartInfo("powershell.exe",
-            $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -Source \"{Path.Combine(extracted, "SolidWorksAddin")}\"")
+        var source = Path.Combine(extracted, "SolidWorksAddin");
+        Directory.CreateDirectory(source);
+        var hashes = new List<string>();
+        using (var zip = new ZipArchive(new MemoryStream(zipBytes), ZipArchiveMode.Read))
         {
-            UseShellExecute = showConsole,
-            CreateNoWindow = !showConsole,
-            RedirectStandardOutput = !showConsole,
-            RedirectStandardError = !showConsole,
-        };
-        using var install = Process.Start(start) ?? throw new PdmException("The add-in installer didn't start.");
-        var output = showConsole ? Task.FromResult("") : install.StandardOutput.ReadToEndAsync();
-        var errors = showConsole ? Task.FromResult("") : install.StandardError.ReadToEndAsync();
-        await install.WaitForExitAsync();
-        var log = ((await output) + (await errors)).Trim();
-        if (install.ExitCode != 0 && !showConsole)
-        {
-            throw new PdmException(log.IndexOf("SolidWorks is running", StringComparison.OrdinalIgnoreCase) >= 0
-                ? "Close SolidWorks (save your work first), then try again."
-                : "The SolidWorks add-in wasn't installed (Windows' permission prompt was cancelled, or registering it failed). Click the button to try again.", log);
+            foreach (var entry in zip.Entries)
+            {
+                var parts = entry.FullName.Replace('\\', '/').Split('/');
+                if (parts.Length != 2 || parts[0] != "SolidWorksAddin" || !parts[1].EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) continue;
+                if (parts[1].IndexOfAny(new[] { '=', ';', '\'' }) >= 0) throw new PdmException($"{Updater.AddinAsset} has a file with an unexpected name ({parts[1]}).");
+                using var memory = new MemoryStream();
+                using (var stream = entry.Open()) await stream.CopyToAsync(memory);
+                var bytes = memory.ToArray();
+                File.WriteAllBytes(Path.Combine(source, parts[1]), bytes);
+                hashes.Add(parts[1] + "=" + Updater.Sha256(bytes));
+            }
         }
+        if (!hashes.Any(h => h.StartsWith("Jarvis.SwAddin.dll=", StringComparison.OrdinalIgnoreCase))) throw new PdmException($"{Updater.AddinAsset} is missing the add-in.");
+
+        var scriptBytes = InstallerScript();
+        var script = Path.Combine(extracted, "Install-SolidWorksAddin.ps1");
+        File.WriteAllBytes(script, scriptBytes);
+
+        // "Load at startup" is per user: set here, so it lands in this account even if the permission prompt is answered with another one.
+        using (var startup = Registry.CurrentUser.CreateSubKey(@"Software\SolidWorks\AddInsStartup\" + AddinGuid))
+        {
+            startup.SetValue("", 1, RegistryValueKind.DWord);
+        }
+
+        // The elevated PowerShell reads the script once, checks those bytes, and runs exactly those bytes.
+        static string Quote(string text) => "'" + text.Replace("'", "''") + "'";
+        var command =
+            $"$b = [IO.File]::ReadAllBytes({Quote(script)}); " +
+            "$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($b)).Replace('-', ''); " +
+            $"if ($h -ne {Quote(Updater.Sha256(scriptBytes))}) {{ Write-Host 'The installer was changed on disk, so it was not run.' -ForegroundColor Red; Start-Sleep -Seconds 6; exit 9 }}; " +
+            $"& ([scriptblock]::Create([Text.Encoding]::UTF8.GetString($b))) -Elevated -Source {Quote(source)} -Hashes {Quote(string.Join(";", hashes))}";
+        var start = new ProcessStartInfo("powershell.exe",
+            "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(command)))
+        {
+            UseShellExecute = true,
+            Verb = "runas",
+        };
+        Process install;
+        try
+        {
+            install = Process.Start(start) ?? throw new PdmException("The add-in installer didn't start.");
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            throw new PdmException("The SolidWorks add-in wasn't installed: Windows' permission prompt was cancelled. Try again and click Yes.", ex.ToString());
+        }
+        using (install)
+        {
+            await install.WaitForExitAsync();
+            if (install.ExitCode == 9) throw new PdmException("The add-in installer was changed on disk after Jarvis checked it, so it wasn't run. Try again; if it keeps happening, something on this PC is changing files in your Temp folder.");
+            if (install.ExitCode != 0) throw new PdmException("The SolidWorks add-in wasn't installed (registering it failed; the installer's window said why). Close SolidWorks and try again.");
+        }
+    }
+
+    private const string AddinGuid = "{9BD312D2-4FE8-4BEF-AB6C-91F6EA2CFB78}";
+
+    /// <summary>scripts\Install-SolidWorksAddin.ps1 as built into this exe.</summary>
+    private static byte[] InstallerScript()
+    {
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Jarvis.Client.InstallAddin.ps1")
+                           ?? throw new PdmException("This build of Jarvis is missing the add-in installer.");
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
     }
 }

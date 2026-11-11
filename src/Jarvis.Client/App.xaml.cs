@@ -20,7 +20,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var args = e.Args;
+        AppLog.Start();
+        // Old backups (copies of files Jarvis replaced or deleted) are CAD files: clear out the ones nobody will want any more.
+        _ = System.Threading.Tasks.Task.Run(() => Jarvis.Core.Vault.FileUtil.PruneBackups(Jarvis.Core.Vault.FileUtil.BackupsKeptFor));
         ModernWindows.Apply(this);
+        // JARVIS_THEME (Light or Dark) overrides the setting, for trying the looks out.
+        ThemeManager.Apply(Environment.GetEnvironmentVariable("JARVIS_THEME") ?? UserSettings.Load().Theme);
 
         if (args.Length >= 1 && args[0] == "--register-explorer")
         {
@@ -89,9 +94,10 @@ public partial class App : Application
 
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        AppLog.Write("UNEXPECTED " + e.Exception);
         MessageBox.Show(
             "Something unexpected went wrong:\n\n" + e.Exception.Message +
-            "\n\nYour files are safe. If this keeps happening, send a screenshot of this message to whoever maintains Jarvis.",
+            "\n\nYour files are safe. If this keeps happening, send %LocalAppData%\\Jarvis\\app.log to whoever maintains Jarvis.",
             "Jarvis", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }

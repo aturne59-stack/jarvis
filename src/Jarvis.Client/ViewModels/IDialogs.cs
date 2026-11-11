@@ -46,6 +46,8 @@ public sealed class VaultChoice
 public interface IDialogs
 {
     void ShowError(PdmException error);
+    /// <summary>Shows an error that has a one-click way out (the blue <paramref name="fixText"/> button). True if the user chose it.</summary>
+    bool ShowErrorWithFix(PdmException error, string fixText, string fixToolTip);
     void ShowMessage(string title, string message, bool isWarning);
     bool Confirm(string title, string message);
     CheckInRequest? AskCheckIn(string title, string okText, IReadOnlyList<string> files, string defaultComment, bool allowKeepCheckedOut, string? prompt = null, string? footnote = null);
@@ -72,6 +74,8 @@ public interface IDialogs
     string? AskFolder(string title, string vaultName, IReadOnlyList<string> folders, string? current, System.Func<string, string, string> createFolder);
     /// <summary>Export: where to and how (<paramref name="what"/> names the chosen files). Null if cancelled.</summary>
     ExportOptions? AskExport(string what, string defaultName);
+    /// <summary>Asks where to save a file (<paramref name="filter"/> like "CSV for Excel (*.csv)|*.csv"). Null if cancelled.</summary>
+    string? AskSaveFile(string title, string defaultName, string filter);
     /// <summary>Picks a folder on this PC (outside the vault). Null if cancelled.</summary>
     string? AskFolderOnDisk(string title);
     /// <summary>
